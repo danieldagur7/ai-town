@@ -26,6 +26,7 @@ import { DAY_LENGTH, clockState, isSleepTime, isWindDown } from './clock';
 import { bedFor } from './beds';
 import { Player } from './player';
 import { BED_WALK_TIMEOUT } from '../constants';
+import { GOD_CHARACTER } from '../../data/characters';
 
 const SLEEPING = 'sleeping';
 
@@ -74,11 +75,17 @@ export class Agent {
       console.log(`Timing out ${JSON.stringify(this.inProgressOperation)}`);
       delete this.inProgressOperation;
     }
-    if (isSleepTime(game.world)) {
+    const conversation = game.world.playerConversation(player);
+    // Nobody walks away from their god at bedtime; they go to bed afterwards.
+    const talkingToGod =
+      !!conversation &&
+      [...conversation.participants.keys()].some(
+        (id) => game.playerDescriptions.get(id)?.character === GOD_CHARACTER,
+      );
+    if (isSleepTime(game.world) && !talkingToGod) {
       this.tickNight(game, now, player);
       return;
     }
-    const conversation = game.world.playerConversation(player);
     // Late evening: finish any conversation, then head home before dark.
     if (isWindDown(game.world) && !conversation) {
       if (this.toRemember) {

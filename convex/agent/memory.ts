@@ -50,7 +50,7 @@ export async function rememberConversation(
       role: 'user',
       content: `You are ${player.name}, and you just finished a conversation with ${otherPlayer.name}. I would
       like you to summarize the conversation from ${player.name}'s perspective, using first-person pronouns like
-      "I," and add if you liked or disliked this interaction.`,
+      "I," and add if you liked or disliked this interaction. Keep it to two or three sentences.`,
     },
   ];
   const authors = new Set<GameId<'players'>>();
@@ -68,7 +68,7 @@ export async function rememberConversation(
   llmMessages.push({ role: 'user', content: 'Summary:' });
   const { content } = await chatCompletion({
     messages: llmMessages,
-    max_tokens: 500,
+    max_tokens: 150,
   });
   const description = `Conversation with ${otherPlayer.name} at ${new Date(
     data.conversation._creationTime,

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PixiGame from './PixiGame.tsx';
 
 import { useElementSize } from 'usehooks-ts';
@@ -41,15 +41,26 @@ export default function Game() {
   const { speechRadius } = useGodUi();
   const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
 
+  // PlayerDetails follows the human's conversation even with nothing selected,
+  // so keep the pop-up open while the human is talking to someone.
+  const humanPlayer =
+    game && [...game.world.players.values()].find((p) => p.human === humanTokenIdentifier);
+  const humanConversation = humanPlayer && game.world.playerConversation(humanPlayer);
+  const humanInConversation = !!humanConversation;
+  // Select whoever the human is talking to, so the pop-up stays on them after
+  // the conversation ends and a reply that arrives late still shows up.
+  const partnerId =
+    humanConversation &&
+    [...humanConversation.participants.keys()].find((id) => id !== humanPlayer!.id);
+  useEffect(() => {
+    if (partnerId) {
+      setSelectedElement({ kind: 'player', id: partnerId });
+    }
+  }, [partnerId]);
+
   if (!worldId || !engineId || !game) {
     return null;
   }
-  // PlayerDetails follows the human's conversation even with nothing selected,
-  // so keep the pop-up open while the human is talking to someone.
-  const humanPlayer = [...game.world.players.values()].find(
-    (p) => p.human === humanTokenIdentifier,
-  );
-  const humanInConversation = !!humanPlayer && !!game.world.playerConversation(humanPlayer);
   const showDetails = !!selectedElement || humanInConversation;
   return (
     <>
