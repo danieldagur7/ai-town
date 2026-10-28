@@ -53,6 +53,7 @@ function GodMenuPanel({
         </a>
       </div>
       <PrayerInbox worldId={worldId} />
+      <Decrees worldId={worldId} />
       <FaithScores worldId={worldId} />
       <section className="flex flex-col gap-2">
         <h3 className="text-xl">Time</h3>
@@ -68,6 +69,87 @@ function GodMenuPanel({
   );
 }
 
+function Decrees({ worldId }: { worldId: Id<'worlds'> }) {
+  const decrees = useQuery(api.god.decrees.listDecrees, { worldId });
+  const issueDecree = useMutation(api.god.decrees.issueDecree);
+  const endDecree = useMutation(api.god.decrees.endDecree);
+  const [text, setText] = useState('');
+  const issue = async () => {
+    if (!text.trim()) {
+      return;
+    }
+    await toastOnError(issueDecree({ worldId, text }));
+    setText('');
+  };
+  if (!decrees) {
+    return null;
+  }
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="text-xl">Decrees</h3>
+      <div className="flex flex-col gap-2">
+        <textarea
+          className="text-sm text-black bg-white p-2 resize-none"
+          rows={2}
+          placeholder='A mission for the town, e.g. "Grow more food"'
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <button
+          className="bg-clay-700 text-white text-lg py-1 disabled:opacity-50"
+          disabled={!text.trim()}
+          onClick={() => void issue()}
+        >
+          Issue decree
+        </button>
+      </div>
+      {decrees.active.map((decree) => (
+        <div key={decree._id} className="bg-brown-200 text-black p-3 flex flex-col gap-2">
+          <p className="text-sm font-bold">“{decree.text}”</p>
+          {decree.opinions.length === 0 ? (
+            <p className="text-xs text-brown-700">Nobody has talked about it yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {decree.opinions.map((o) => (
+                <li key={o.name} className="text-xs leading-snug">
+                  {o.text}
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <button
+              className="flex-1 bg-clay-700 text-white text-sm py-1"
+              onClick={() =>
+                void toastOnError(endDecree({ decreeId: decree._id, status: 'completed' }))
+              }
+            >
+              Completed
+            </button>
+            <button
+              className="flex-1 bg-brown-900 text-white text-sm py-1"
+              onClick={() =>
+                void toastOnError(endDecree({ decreeId: decree._id, status: 'cancelled' }))
+              }
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ))}
+      {decrees.ended.length > 0 && (
+        <ul className="flex flex-col gap-1 text-xs text-brown-300">
+          {decrees.ended.map((d) => (
+            <li key={d._id}>
+              {d.status === 'completed' ? '✓' : '✗'} “{d.text}” ({d.status})
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
   const inbox = useQuery(api.god.prayers.prayerInbox, { worldId });
   if (!inbox) {
@@ -80,7 +162,9 @@ function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
         <p className="text-sm text-brown-300">Praying now: {inbox.praying.join(', ')}…</p>
       )}
       {inbox.pending.length === 0 && (
-        <p className="text-sm text-brown-300">No prayers waiting. Characters pray as they fall asleep.</p>
+        <p className="text-sm text-brown-300">
+          No prayers waiting. Characters pray as they fall asleep.
+        </p>
       )}
       {inbox.pending.map((prayer) => (
         <PrayerCard key={prayer._id} prayer={prayer} />
@@ -150,7 +234,10 @@ function FaithScores({ worldId }: { worldId: Id<'worlds'> }) {
         <div key={name} className="flex items-center gap-2 text-sm">
           <span className="w-16 shrink-0">{name}</span>
           <div className="flex-1 h-3 bg-brown-900">
-            <div className="h-full bg-clay-300" style={{ width: `${(score / faith.max) * 100}%` }} />
+            <div
+              className="h-full bg-clay-300"
+              style={{ width: `${(score / faith.max) * 100}%` }}
+            />
           </div>
           <span className="w-8 text-right">{score}</span>
         </div>

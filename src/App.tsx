@@ -20,7 +20,6 @@ export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-brown-900 font-body">
-
       <ReactModal
         isOpen={helpModalOpen}
         onRequestClose={() => setHelpModalOpen(false)}

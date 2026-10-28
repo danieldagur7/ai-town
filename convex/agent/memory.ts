@@ -54,9 +54,11 @@ export async function rememberConversation(
     },
   ];
   const authors = new Set<GameId<'players'>>();
+  const transcript = [];
   for (const message of messages) {
     const author = message.author === player.id ? player : otherPlayer;
     authors.add(author.id as GameId<'players'>);
+    transcript.push({ author: author.name, text: message.text });
     const recipient = message.author === player.id ? otherPlayer : player;
     llmMessages.push({
       role: 'user',
@@ -86,6 +88,14 @@ export async function rememberConversation(
       playerIds: [...authors],
     },
     embedding,
+  });
+  // Note what they said about the god's decrees, without holding up the agent.
+  await ctx.scheduler.runAfter(0, internal.god.decrees.summarizeDecreeTalk, {
+    worldId,
+    playerId: player.id,
+    name: player.name,
+    otherName: otherPlayer.name,
+    transcript,
   });
   await reflectOnMemories(ctx, worldId, playerId);
   return description;

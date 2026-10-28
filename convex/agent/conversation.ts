@@ -8,6 +8,7 @@ import * as embeddingsCache from './embeddingsCache';
 import { GameId, conversationId, playerId } from '../aiTown/ids';
 import { NUM_MEMORIES_TO_SEARCH } from '../constants';
 import { faithDescription } from '../god/faith';
+import { activeDecrees, decreesPrompt } from '../god/decrees';
 
 const selfInternal = internal.agent.conversation;
 
@@ -18,7 +19,7 @@ export async function startConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, agent, otherAgent, lastConversation } = await ctx.runQuery(
+  const { player, otherPlayer, agent, otherAgent, lastConversation, decrees } = await ctx.runQuery(
     selfInternal.queryPromptData,
     {
       worldId,
@@ -46,6 +47,7 @@ export async function startConversationMessage(
     `You are ${player.name}, and you just started a conversation with ${otherPlayer.name}.`,
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
+  prompt.push(...decreesPrompt(decrees));
   prompt.push(...previousConversationPrompt(otherPlayer, lastConversation));
   prompt.push(...relatedMemoriesPrompt(memories));
   if (memoryWithOtherPlayer) {
@@ -76,7 +78,7 @@ export async function continueConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent } = await ctx.runQuery(
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees } = await ctx.runQuery(
     selfInternal.queryPromptData,
     {
       worldId,
@@ -97,6 +99,7 @@ export async function continueConversationMessage(
     `The conversation started at ${started.toLocaleString()}. It's now ${now.toLocaleString()}.`,
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
+  prompt.push(...decreesPrompt(decrees));
   prompt.push(...relatedMemoriesPrompt(memories));
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
@@ -134,7 +137,7 @@ export async function leaveConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent } = await ctx.runQuery(
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees } = await ctx.runQuery(
     selfInternal.queryPromptData,
     {
       worldId,
@@ -148,6 +151,7 @@ export async function leaveConversationMessage(
     `You've decided to leave the question and would like to politely tell them you're leaving the conversation.`,
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
+  prompt.push(...decreesPrompt(decrees));
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
     `How would you like to tell them that you're leaving? Your response should be brief and within 200 characters.`,
@@ -334,6 +338,7 @@ export const queryPromptData = internalQuery({
       .query('faith')
       .withIndex('playerId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
+    const decrees = await activeDecrees(ctx.db, args.worldId);
     return {
       player: { name: playerDescription.name, ...player },
       otherPlayer: { name: otherPlayerDescription.name, ...otherPlayer },
@@ -350,6 +355,7 @@ export const queryPromptData = internalQuery({
         ...otherAgent,
       },
       lastConversation,
+      decrees: decrees.map((d) => d.text),
     };
   },
 });

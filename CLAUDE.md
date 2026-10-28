@@ -66,6 +66,12 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
     skipped. Answering adjusts `faith` and adds a `prayer` memory via `rememberAnswer`.
   - Faith (`convex/god/faith.ts`): 0–100, starts at 50 on the first answer. Only then
     does a private faith line appear in that character's conversation prompts.
+  - Decrees (`convex/god/decrees.ts`): active decrees (newest `MAX_DECREES_IN_PROMPT`)
+    are injected straight into conversation and prayer prompts via `decreesPrompt`,
+    not left to memory search. After a conversation is remembered,
+    `summarizeDecreeTalk` keyword-filters the speaker's lines and asks the LLM what
+    they said about each decree, saving it to `decreeOpinions` for the God menu.
+    There is no LLM planning step yet; Stage 5d adds one and should reuse the same helper.
 - **Agents** (`convex/aiTown/agent.ts`): `Agent.tick` is rule-based (wander/activity,
   invite, accept/reject, walk over, talk, leave, remember). Anything slow is an
   operation (`startOperation` → `convex/aiTown/agentOperations.ts` internalAction),

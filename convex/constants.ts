@@ -108,3 +108,6 @@ export const PRAYER_MEMORY_CHARS = 300;
 // Importance of the memory a character gets when its prayer is answered or not.
 export const PRAYER_ANSWERED_IMPORTANCE = 8;
 export const PRAYER_DECLINED_IMPORTANCE = 6;
+
+// God mode: decrees. At most this many active decrees (newest first) go into prompts.
+export const MAX_DECREES_IN_PROMPT = 3;

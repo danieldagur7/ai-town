@@ -31,6 +31,25 @@ export const godTables = {
     .index('player_night', ['worldId', 'playerId', 'night'])
     .index('status', ['worldId', 'status']),
 
+  // The god's mission statements for the town. Active ones go into every
+  // character's prompts.
+  decrees: defineTable({
+    worldId: v.id('worlds'),
+    text: v.string(),
+    status: v.union(v.literal('active'), v.literal('completed'), v.literal('cancelled')),
+    created: v.number(),
+    ended: v.optional(v.number()),
+  }).index('status', ['worldId', 'status']),
+
+  // What a character said about a decree in a conversation, summarized by the LLM.
+  decreeOpinions: defineTable({
+    worldId: v.id('worlds'),
+    decreeId: v.id('decrees'),
+    playerId,
+    name: v.string(),
+    text: v.string(),
+  }).index('decreeId', ['decreeId']),
+
   // Created the first time the god answers one of a character's prayers.
   faith: defineTable({
     worldId: v.id('worlds'),

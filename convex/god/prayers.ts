@@ -13,6 +13,7 @@ import { internal } from '../_generated/api';
 import { agentId, playerId } from '../aiTown/ids';
 import { chatCompletion, fetchEmbedding } from '../util/llm';
 import { faithDescription } from './faith';
+import { activeDecrees } from './decrees';
 import {
   FAITH_ANSWERED,
   FAITH_IGNORED,
@@ -143,6 +144,9 @@ async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
   if (data.lastAnswer) {
     prompt.push(data.lastAnswer);
   }
+  if (data.decrees.length > 0) {
+    prompt.push('The god has decreed:', ...data.decrees.map((d) => ` - "${d}"`));
+  }
   if (data.memories.length > 0) {
     prompt.push('Things on your mind from recently:');
     prompt.push(...data.memories.map((m) => ` - ${m}`));
@@ -157,7 +161,10 @@ async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
     messages: [{ role: 'user', content: prompt.join('\n') }],
     max_tokens: 200,
   });
-  const text = content.trim().replace(/^["“]|["”]$/g, '').trim();
+  const text = content
+    .trim()
+    .replace(/^["“]|["”]$/g, '')
+    .trim();
   if (!text) {
     throw new Error('Empty prayer');
   }
@@ -182,14 +189,11 @@ export const prayerPromptData = internalQuery({
       .first();
     const answered = await ctx.db
       .query('prayers')
-      .withIndex('player_night', (q) =>
-        q.eq('worldId', args.worldId).eq('playerId', args.playerId),
-      )
+      .withIndex('player_night', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .order('desc')
-      .filter((q) =>
-        q.or(q.eq(q.field('status'), 'accepted'), q.eq(q.field('status'), 'declined')),
-      )
+      .filter((q) => q.or(q.eq(q.field('status'), 'accepted'), q.eq(q.field('status'), 'declined')))
       .first();
+    const decrees = await activeDecrees(ctx.db, args.worldId);
     let lastAnswer;
     if (answered) {
       lastAnswer =
@@ -202,6 +206,7 @@ export const prayerPromptData = internalQuery({
       plan: agentDescription?.plan ?? '',
       faith: faith?.score,
       lastAnswer,
+      decrees: decrees.map((d) => d.text),
       memories: memories.map((m) => m.description.slice(0, PRAYER_MEMORY_CHARS)),
     };
   },
