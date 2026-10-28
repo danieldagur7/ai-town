@@ -27,6 +27,11 @@ export const memoryFields = {
       type: v.literal('reflection'),
       relatedMemoryIds: v.array(v.id('memories')),
     }),
+    // The god answered (or ignored) one of this player's prayers.
+    v.object({
+      type: v.literal('prayer'),
+      prayerId: v.id('prayers'),
+    }),
   ),
 };
 export const memoryTables = {

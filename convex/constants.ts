@@ -94,3 +94,17 @@ export const BED_WALK_TIMEOUT = 90_000;
 // Cap on how far the clock moves in one tick, so restarting a stopped world
 // doesn't skip ahead.
 export const MAX_CLOCK_TICK = 1000;
+
+// God mode: prayers and faith. Faith runs from 0 to FAITH_MAX per character.
+export const FAITH_MAX = 100;
+export const FAITH_START = 50;
+export const FAITH_ANSWERED = 10;
+export const FAITH_IGNORED = -10;
+// A prayer stuck generating this long (e.g. its action crashed) is given up on.
+export const PRAYER_GENERATION_TIMEOUT = 5 * 60_000;
+// How many recent memories a prayer draws on, and how much of each.
+export const PRAYER_RECENT_MEMORIES = 5;
+export const PRAYER_MEMORY_CHARS = 300;
+// Importance of the memory a character gets when its prayer is answered or not.
+export const PRAYER_ANSWERED_IMPORTANCE = 8;
+export const PRAYER_DECLINED_IMPORTANCE = 6;

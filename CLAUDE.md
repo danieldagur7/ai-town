@@ -57,8 +57,15 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   bed; at night `Agent.tickNight` ends conversations, remembers them, and sleeps
   (activity `sleeping` 😴); they wake on the next morning. UI: `ClockBadge`,
   `DayNightOverlay`, `Beds`.
-- **God mode** (`convex/aiTown/godMode.ts`, `src/components/GodMenu.tsx`): a pop-up menu
-  in the toolbar collecting god features as engine inputs. Currently: skip to next phase.
+- **God mode** (`src/components/GodMenu.tsx`): a pop-up menu in the toolbar.
+  - Skip to next phase: engine input in `convex/aiTown/godMode.ts`.
+  - Prayers (`convex/god/prayers.ts`, tables in `convex/god/schema.ts`): when an agent
+    falls asleep the engine schedules `requestPrayer` (not an agent operation, so it
+    never blocks the agent). A single worker (`processQueue`, serialized by
+    `claimNext`) writes one prayer at a time; queued prayers from an older night are
+    skipped. Answering adjusts `faith` and adds a `prayer` memory via `rememberAnswer`.
+  - Faith (`convex/god/faith.ts`): 0–100, starts at 50 on the first answer. Only then
+    does a private faith line appear in that character's conversation prompts.
 - **Agents** (`convex/aiTown/agent.ts`): `Agent.tick` is rule-based (wander/activity,
   invite, accept/reject, walk over, talk, leave, remember). Anything slow is an
   operation (`startOperation` → `convex/aiTown/agentOperations.ts` internalAction),

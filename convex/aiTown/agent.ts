@@ -22,7 +22,7 @@ import { distance } from '../util/geometry';
 import { internal } from '../_generated/api';
 import { movePlayer, stopPlayer } from './movement';
 import { insertInput } from './insertInput';
-import { DAY_LENGTH, isSleepTime, isWindDown } from './clock';
+import { DAY_LENGTH, clockState, isSleepTime, isWindDown } from './clock';
 import { bedFor } from './beds';
 import { Player } from './player';
 import { BED_WALK_TIMEOUT } from '../constants';
@@ -312,6 +312,14 @@ export class Agent {
       stopPlayer(player);
       // Waking clears this, so `until` just needs to outlast the night.
       player.activity = { description: SLEEPING, emoji: '😴', until: now + DAY_LENGTH };
+      // Say a prayer before sleeping. It's generated outside the engine, and
+      // doesn't hold up the agent like an operation would.
+      game.scheduleOperation('requestPrayer', {
+        worldId: game.worldId,
+        playerId: player.id,
+        agentId: this.id,
+        night: clockState(game.world.clock!.elapsed).day,
+      });
     }
   }
 
@@ -402,6 +410,9 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
       break;
     case 'agentDoSomething':
       reference = internal.aiTown.agentOperations.agentDoSomething;
+      break;
+    case 'requestPrayer':
+      reference = internal.god.prayers.requestPrayer;
       break;
     default:
       throw new Error(`Unknown operation: ${operation}`);
