@@ -15,6 +15,7 @@ export const Character = ({
   emoji = '',
   isViewer = false,
   speed = 0.1,
+  name,
   onClick,
 }: {
   // Path to the texture packed image.
@@ -35,9 +36,12 @@ export const Character = ({
   isViewer?: boolean;
   // The speed of the animation. Can be tuned depending on the side and speed of the NPC.
   speed?: number;
+  // Shown above the character while hovered.
+  name?: string;
   onClick: () => void;
 }) => {
   const [spriteSheet, setSpriteSheet] = useState<Spritesheet>();
+  const [hovered, setHovered] = useState(false);
   useEffect(() => {
     const parseSheet = async () => {
       const sheet = new Spritesheet(
@@ -84,7 +88,15 @@ export const Character = ({
   }
 
   return (
-    <Container x={x} y={y} interactive={true} pointerdown={onClick} cursor="pointer">
+    <Container
+      x={x}
+      y={y}
+      interactive={true}
+      pointerdown={onClick}
+      pointerover={() => setHovered(true)}
+      pointerout={() => setHovered(false)}
+      cursor="pointer"
+    >
       {isThinking && (
         // TODO: We'll eventually have separate assets for thinking and speech animations.
         <Text x={-20} y={-10} scale={{ x: -0.8, y: 0.8 }} text={'💭'} anchor={{ x: 0.5, y: 0.5 }} />
@@ -104,9 +116,38 @@ export const Character = ({
       {emoji && (
         <Text x={0} y={-24} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
       )}
+      {hovered && name && <NameLabel name={name} y={emoji ? -40 : -26} />}
     </Container>
   );
 };
+
+const nameStyle = new PIXI.TextStyle({
+  fontFamily: 'VCR OSD Mono, monospace',
+  fontSize: 14,
+  fill: 0xffffff,
+  stroke: 0x181425,
+  strokeThickness: 3,
+});
+
+function NameLabel({ name, y }: { name: string; y: number }) {
+  const width = PIXI.TextMetrics.measureText(name, nameStyle).width + 10;
+  const draw = useCallback(
+    (g: PIXI.Graphics) => {
+      g.clear();
+      g.beginFill(0x3f2832, 0.9);
+      g.lineStyle(2, 0x181425, 1);
+      g.drawRect(-width / 2, -10, width, 20);
+      g.endFill();
+    },
+    [width],
+  );
+  return (
+    <Container y={y}>
+      <Graphics draw={draw} />
+      <Text text={name} style={nameStyle} anchor={{ x: 0.5, y: 0.5 }} resolution={2} />
+    </Container>
+  );
+}
 
 function ViewerIndicator() {
   const draw = useCallback((g: PIXI.Graphics) => {

@@ -17,6 +17,15 @@ export type ViewportProps = {
   children?: ReactNode;
 };
 
+// Zoomed all the way out, the whole map fits on screen.
+function zoomLimits(props: ViewportProps) {
+  const fit = Math.min(
+    props.screenWidth / props.worldWidth,
+    props.screenHeight / props.worldHeight,
+  );
+  return { minScale: fit > 0 ? fit : 0.1, maxScale: 3.0 };
+}
+
 // https://davidfig.github.io/pixi-viewport/jsdoc/Viewport.html
 export default PixiComponent('Viewport', {
   create(props: ViewportProps) {
@@ -38,10 +47,7 @@ export default PixiComponent('Viewport', {
       .decelerate()
       .clamp({ direction: 'all', underflow: 'center' })
       .setZoom(-10)
-      .clampZoom({
-        minScale: (1.04 * props.screenWidth) / (props.worldWidth / 2),
-        maxScale: 3.0,
-      });
+      .clampZoom(zoomLimits(props));
     return viewport;
   },
   applyProps(viewport, oldProps: any, newProps: any) {
@@ -52,5 +58,14 @@ export default PixiComponent('Viewport', {
         viewport[p] = newProps[p];
       }
     });
+    // Recompute the zoom-out limit when the window (or map) size changes.
+    if (
+      oldProps.screenWidth !== newProps.screenWidth ||
+      oldProps.screenHeight !== newProps.screenHeight ||
+      oldProps.worldWidth !== newProps.worldWidth ||
+      oldProps.worldHeight !== newProps.worldHeight
+    ) {
+      viewport.clampZoom(zoomLimits(newProps));
+    }
   },
 });
