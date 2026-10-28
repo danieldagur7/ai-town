@@ -35,16 +35,24 @@ export default function Game() {
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
+  const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
 
   if (!worldId || !engineId || !game) {
     return null;
   }
+  // PlayerDetails follows the human's conversation even with nothing selected,
+  // so keep the pop-up open while the human is talking to someone.
+  const humanPlayer = [...game.world.players.values()].find(
+    (p) => p.human === humanTokenIdentifier,
+  );
+  const humanInConversation = !!humanPlayer && !!game.world.playerConversation(humanPlayer);
+  const showDetails = !!selectedElement || humanInConversation;
   return (
     <>
       {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
-      <div className="mx-auto w-full max-w grid grid-rows-[240px_1fr] lg:grid-rows-[1fr] lg:grid-cols-[1fr_auto] lg:grow max-w-[1400px] min-h-[480px] game-frame">
+      <div className="relative h-full w-full">
         {/* Game area */}
-        <div className="relative overflow-hidden bg-brown-900" ref={gameWrapperRef}>
+        <div className="absolute inset-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
             <div className="container">
               <Stage width={width} height={height} options={{ backgroundColor: 0x7ab5ff }}>
@@ -65,20 +73,22 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
             </div>
           </div>
         </div>
-        {/* Right column area */}
-        <div
-          className="flex flex-col overflow-y-auto shrink-0 px-4 py-6 sm:px-6 lg:w-96 xl:pr-6 border-t-8 sm:border-t-0 sm:border-l-8 border-brown-900  bg-brown-800 text-brown-100"
-          ref={scrollViewRef}
-        >
-          <PlayerDetails
-            worldId={worldId}
-            engineId={engineId}
-            game={game}
-            playerId={selectedElement?.id}
-            setSelectedElement={setSelectedElement}
-            scrollViewRef={scrollViewRef}
-          />
-        </div>
+        {/* Pop-up details panel, shown when an agent is selected */}
+        {showDetails && (
+          <div
+            className="absolute right-4 top-20 bottom-4 z-10 w-[calc(100%-2rem)] sm:w-96 flex flex-col overflow-y-auto px-4 py-6 sm:px-6 border-8 border-brown-900 bg-brown-800 text-brown-100 shadow-2xl"
+            ref={scrollViewRef}
+          >
+            <PlayerDetails
+              worldId={worldId}
+              engineId={engineId}
+              game={game}
+              playerId={selectedElement?.id}
+              setSelectedElement={setSelectedElement}
+              scrollViewRef={scrollViewRef}
+            />
+          </div>
+        )}
       </div>
     </>
   );
