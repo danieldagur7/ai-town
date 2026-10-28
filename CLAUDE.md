@@ -72,6 +72,14 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
     kick. Conversation prompts flag the god so characters recognize them. Speaking gives
     everyone in radius a `godSpeech` memory, kneeling 🙏 and +faith; `world.godSpeech`
     drives the pulse. The radius preview is shared via `src/godUi.tsx`.
+  - Punishment (`punish` input in `convex/aiTown/godMode.ts`, `convex/god/punishment.ts`):
+    lightning stuns the target (⚡), ends their conversation and is seen within
+    `PUNISH_WITNESS_RADIUS`; target and witnesses get memories, faith drops, and
+    `punishmentPrompt` keeps it in conversation/prayer prompts for a couple of game days.
+    `world.godSmite` drives the bolt and screen flash.
+  - The manifested god can interrupt: `startConversation` from the god pulls both sides
+    out of their current conversations.
+  - Prayer summaries: `summarizePrayers` action fills `prayers.summary` on demand.
   - Decrees (`convex/god/decrees.ts`): active decrees (newest `MAX_DECREES_IN_PROMPT`)
     are injected straight into conversation and prayer prompts via `decreesPrompt`,
     not left to memory search. After a conversation is remembered,

@@ -1,3 +1,4 @@
+import { GOD_CHARACTER } from '../../data/characters';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -64,7 +65,15 @@ export default function PlayerDetails({
     return null;
   }
   const isMe = humanPlayer && player.id === humanPlayer.id;
-  const canInvite = !isMe && !playerConversation && humanPlayer && !humanConversation;
+  // The manifested god can call anyone over, even mid-conversation.
+  const isGod =
+    !!humanPlayer && game.playerDescriptions.get(humanPlayer.id)?.character === GOD_CHARACTER;
+  const inSameConversation =
+    !!humanConversation && !!playerConversation && humanConversation.id === playerConversation.id;
+  const canInvite =
+    !isMe &&
+    humanPlayer &&
+    (isGod ? !inSameConversation : !playerConversation && !humanConversation);
   const sameConversation =
     !isMe &&
     humanPlayer &&

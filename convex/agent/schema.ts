@@ -36,6 +36,11 @@ export const memoryFields = {
     v.object({
       type: v.literal('godSpeech'),
     }),
+    // The god punished this player, or the player saw someone punished.
+    v.object({
+      type: v.literal('punishment'),
+      punishmentId: v.id('punishments'),
+    }),
   ),
 };
 export const memoryTables = {

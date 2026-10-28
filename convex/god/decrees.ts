@@ -30,10 +30,11 @@ export function decreesPrompt(decrees: string[]): string[] {
     return [];
   }
   return [
-    'The unseen god of this town has decreed the following, and everyone in town knows it:',
+    'Your god has commanded the following, and everyone in town knows it:',
     ...decrees.map((d) => ` - "${d}"`),
-    'You have your own feelings about these decrees, shaped by who you are. Bring them up ' +
-      "when it fits the conversation, but don't force them into every message.",
+    'These commands matter: people talk about them, plan around them and feel the god ' +
+      'watching. You have free will and your own opinion of them, but ignoring the god can ' +
+      "bring punishment. Mention them when it fits, but don't force them into every line.",
   ];
 }
 

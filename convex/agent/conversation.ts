@@ -11,6 +11,7 @@ import { DAY_LENGTH, clockState, formatClock } from '../aiTown/clock';
 import { faithDescription } from '../god/faith';
 import { GOD_CHARACTER } from '../../data/characters';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
+import { punishmentPrompt } from '../god/punishment';
 
 const selfInternal = internal.agent.conversation;
 
@@ -38,13 +39,21 @@ export async function startConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, agent, otherAgent, lastConversation, decrees, timeOfDay } =
-    await ctx.runQuery(selfInternal.queryPromptData, {
-      worldId,
-      playerId,
-      otherPlayerId,
-      conversationId,
-    });
+  const {
+    player,
+    otherPlayer,
+    agent,
+    otherAgent,
+    lastConversation,
+    decrees,
+    punishments,
+    timeOfDay,
+  } = await ctx.runQuery(selfInternal.queryPromptData, {
+    worldId,
+    playerId,
+    otherPlayerId,
+    conversationId,
+  });
   const embedding = await embeddingsCache.fetch(
     ctx,
     `${player.name} is talking to ${otherPlayer.name}`,
@@ -66,6 +75,7 @@ export async function startConversationMessage(
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...decreesPrompt(decrees));
+  prompt.push(...punishments);
   prompt.push(...previousConversationPrompt(otherPlayer, lastConversation));
   prompt.push(...relatedMemoriesPrompt(memories));
   if (memoryWithOtherPlayer) {
@@ -97,7 +107,7 @@ export async function continueConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent, decrees, timeOfDay } =
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees, punishments, timeOfDay } =
     await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
@@ -120,6 +130,7 @@ export async function continueConversationMessage(
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...decreesPrompt(decrees));
+  prompt.push(...punishments);
   prompt.push(...relatedMemoriesPrompt(memories));
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
@@ -158,7 +169,7 @@ export async function leaveConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent, decrees, timeOfDay } =
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees, punishments, timeOfDay } =
     await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
@@ -171,6 +182,7 @@ export async function leaveConversationMessage(
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...decreesPrompt(decrees));
+  prompt.push(...punishments);
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
     `How would you like to tell them that you're leaving?`,
@@ -364,6 +376,7 @@ export const queryPromptData = internalQuery({
       .withIndex('playerId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
     const decrees = await activeDecrees(ctx.db, args.worldId);
+    const punishments = await punishmentPrompt(ctx.db, args.worldId, args.playerId);
     const clock = world.clock && clockState(world.clock.elapsed);
     const timeOfDay = clock
       ? `It's ${clock.phase} (${formatClock(clock)}) on day ${clock.day}.`
@@ -389,6 +402,7 @@ export const queryPromptData = internalQuery({
       },
       lastConversation,
       decrees: decrees.map((d) => d.text),
+      punishments,
       timeOfDay,
     };
   },

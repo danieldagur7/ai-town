@@ -15,7 +15,7 @@ import { PositionIndicator } from './PositionIndicator.tsx';
 import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { Beds } from './Beds.tsx';
-import { SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
+import { Smite, SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
 import { GOD_CHARACTER } from '../../data/characters.ts';
 
 export const PixiGame = (props: {
@@ -123,6 +123,7 @@ export const PixiGame = (props: {
           tileDim={tileDim}
         />
       )}
+      {props.game.world.godSmite && <Smite smite={props.game.world.godSmite} tileDim={tileDim} />}
       {props.game.world.godSpeech && (
         <SpeechPulse speech={props.game.world.godSpeech} tileDim={tileDim} />
       )}

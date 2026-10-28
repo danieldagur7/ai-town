@@ -1,3 +1,4 @@
+import { GOD_CHARACTER } from '../../data/characters';
 import { ObjectType, v } from 'convex/values';
 import { GameId, parseGameId } from './ids';
 import { conversationId, playerId } from './ids';
@@ -267,6 +268,15 @@ export const conversationInputs = {
         throw new Error(`Invalid player ID: ${inviteeId}`);
       }
       console.log(`Starting ${playerId} ${inviteeId}...`);
+      // The manifested god can interrupt: both leave whatever they were in.
+      if (game.playerDescriptions.get(playerId)?.character === GOD_CHARACTER) {
+        game.world.playerConversation(player)?.leave(game, now, player);
+        const interrupted = game.world.playerConversation(invitee);
+        if (interrupted) {
+          console.log(`The god interrupts ${interrupted.id} to talk to ${inviteeId}`);
+          interrupted.leave(game, now, invitee);
+        }
+      }
       const { conversationId, error } = Conversation.start(game, now, player, invitee);
       if (!conversationId) {
         // TODO: pass it back to the client for them to show an error.

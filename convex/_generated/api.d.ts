@@ -46,6 +46,7 @@ import type * as god_decrees from "../god/decrees.js";
 import type * as god_faith from "../god/faith.js";
 import type * as god_manifest from "../god/manifest.js";
 import type * as god_prayers from "../god/prayers.js";
+import type * as god_punishment from "../god/punishment.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as messages from "../messages.js";
@@ -106,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   "god/faith": typeof god_faith;
   "god/manifest": typeof god_manifest;
   "god/prayers": typeof god_prayers;
+  "god/punishment": typeof god_punishment;
   http: typeof http;
   init: typeof init;
   messages: typeof messages;

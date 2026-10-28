@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useSendInput, waitForInput } from '../hooks/sendInput';
 import { toastOnError } from '../toasts';
@@ -59,7 +59,7 @@ function GodMenuPanel({
       </div>
       <Manifest worldId={worldId} engineId={engineId} />
       <PrayerInbox worldId={worldId} />
-      <Decrees worldId={worldId} />
+      <Decrees worldId={worldId} engineId={engineId} />
       <FaithScores worldId={worldId} />
       <section className="flex flex-col gap-2">
         <h3 className="text-xl">Time</h3>
@@ -183,7 +183,7 @@ function SpeakToTown({ engineId }: { engineId: Id<'engines'> }) {
   );
 }
 
-function Decrees({ worldId }: { worldId: Id<'worlds'> }) {
+function Decrees({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'engines'> }) {
   const decrees = useQuery(api.god.decrees.listDecrees, { worldId });
   const issueDecree = useMutation(api.god.decrees.issueDecree);
   const endDecree = useMutation(api.god.decrees.endDecree);
@@ -231,6 +231,11 @@ function Decrees({ worldId }: { worldId: Id<'worlds'> }) {
               ))}
             </ul>
           )}
+          <Punish
+            worldId={worldId}
+            engineId={engineId}
+            decree={{ _id: decree._id, text: decree.text }}
+          />
           <div className="flex gap-2">
             <button
               className="flex-1 bg-clay-700 text-white text-sm py-1"
@@ -264,14 +269,101 @@ function Decrees({ worldId }: { worldId: Id<'worlds'> }) {
   );
 }
 
+// Strike a character down for ignoring a decree.
+function Punish({
+  worldId,
+  engineId,
+  decree,
+}: {
+  worldId: Id<'worlds'>;
+  engineId: Id<'engines'>;
+  decree: { _id: Id<'decrees'>; text: string };
+}) {
+  const game = useServerGame(worldId);
+  const punish = useSendInput(engineId, 'punish');
+  const [target, setTarget] = useState('');
+  const [message, setMessage] = useState('');
+  const townspeople = game
+    ? [...game.world.agents.values()].map((a) => ({
+        id: a.playerId,
+        name: game.playerDescriptions.get(a.playerId)?.name ?? a.playerId,
+      }))
+    : [];
+  const strike = async () => {
+    const witnesses = await toastOnError(
+      punish({
+        playerId: target,
+        decreeId: decree._id,
+        decreeText: decree.text,
+        message: message || undefined,
+      }),
+    );
+    const name = townspeople.find((p) => p.id === target)?.name;
+    toast.success(`${name} was struck down${witnesses > 0 ? `; ${witnesses} saw it happen` : ''}.`);
+    setMessage('');
+  };
+  return (
+    <div className="flex flex-col gap-1 border-t border-brown-700 pt-2">
+      <p className="text-xs font-bold">Punish someone for ignoring it</p>
+      <select
+        className="text-sm text-black bg-white p-1"
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+      >
+        <option value="">Choose who…</option>
+        {townspeople.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <input
+        className="text-sm text-black bg-white p-1"
+        placeholder="Optional words of thunder"
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+      <button
+        className="bg-yellow-600 text-black text-sm py-1 font-bold disabled:opacity-50"
+        disabled={!target}
+        onClick={() => void strike()}
+      >
+        ⚡ Strike with lightning
+      </button>
+    </div>
+  );
+}
+
 function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
   const inbox = useQuery(api.god.prayers.prayerInbox, { worldId });
+  const summarizePrayers = useAction(api.god.prayers.summarizePrayers);
+  const [summarizing, setSummarizing] = useState(false);
   if (!inbox) {
     return null;
   }
+  const unsummarized = inbox.pending.filter((p) => !p.summary).length;
+  const summarize = async () => {
+    setSummarizing(true);
+    try {
+      await toastOnError(summarizePrayers({ worldId }));
+    } finally {
+      setSummarizing(false);
+    }
+  };
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="text-xl">Prayers</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl">Prayers</h3>
+        {unsummarized > 0 && (
+          <button
+            className="bg-clay-700 text-white text-sm px-2 py-1 disabled:opacity-50"
+            disabled={summarizing}
+            onClick={() => void summarize()}
+          >
+            {summarizing ? 'Summarizing…' : 'Summarize all'}
+          </button>
+        )}
+      </div>
       {inbox.praying.length > 0 && (
         <p className="text-sm text-brown-300">Praying now: {inbox.praying.join(', ')}…</p>
       )}
@@ -290,7 +382,7 @@ function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
 function PrayerCard({
   prayer,
 }: {
-  prayer: { _id: Id<'prayers'>; name: string; night: number; text?: string };
+  prayer: { _id: Id<'prayers'>; name: string; night: number; text?: string; summary?: string };
 }) {
   const answerPrayer = useMutation(api.god.prayers.answerPrayer);
   const [message, setMessage] = useState('');
@@ -308,7 +400,17 @@ function PrayerCard({
       <p className="text-sm font-bold">
         {prayer.name} · night {prayer.night}
       </p>
-      <p className="text-sm leading-snug">{prayer.text}</p>
+      {prayer.summary ? (
+        <>
+          <p className="text-sm leading-snug font-bold">{prayer.summary}</p>
+          <details className="text-xs">
+            <summary className="cursor-pointer">Full prayer</summary>
+            <p className="leading-snug mt-1">{prayer.text}</p>
+          </details>
+        </>
+      ) : (
+        <p className="text-sm leading-snug">{prayer.text}</p>
+      )}
       <textarea
         className="text-sm text-black bg-white p-2 resize-none"
         rows={2}

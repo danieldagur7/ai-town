@@ -424,6 +424,9 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
     case 'rememberGodSpeech':
       reference = internal.god.manifest.rememberGodSpeech;
       break;
+    case 'rememberPunishment':
+      reference = internal.god.punishment.rememberPunishment;
+      break;
     default:
       throw new Error(`Unknown operation: ${operation}`);
   }

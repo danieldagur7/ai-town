@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Clock, clockState } from '../../convex/aiTown/clock';
 
 // Sky tint by in-game hour: [hour, r, g, b, alpha]. Interpolated between keys.
@@ -24,6 +25,25 @@ function skyColor(hour: number) {
     }
   }
   return 'transparent';
+}
+
+// Brief white flash over the whole map when the god strikes with lightning.
+export function LightningFlash({ time }: { time: number }) {
+  const [visible, setVisible] = useState(Date.now() - time < 400);
+  useEffect(() => {
+    if (Date.now() - time >= 400) {
+      return;
+    }
+    setVisible(true);
+    const timer = setTimeout(() => setVisible(false), 400 - (Date.now() - time));
+    return () => clearTimeout(timer);
+  }, [time]);
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none bg-white transition-opacity duration-300"
+      style={{ opacity: visible ? 0.7 : 0 }}
+    />
+  );
 }
 
 export function DayNightOverlay({ clock }: { clock: Clock }) {

@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import {
+  action,
   ActionCtx,
   internalAction,
   internalMutation,
@@ -13,6 +14,7 @@ import { agentId, playerId } from '../aiTown/ids';
 import { chatCompletion, fetchEmbedding } from '../util/llm';
 import { adjustFaith, faithDescription } from './faith';
 import { activeDecrees } from './decrees';
+import { punishmentPrompt } from './punishment';
 import {
   FAITH_ANSWERED,
   FAITH_IGNORED,
@@ -146,6 +148,7 @@ async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
   if (data.decrees.length > 0) {
     prompt.push('The god has decreed:', ...data.decrees.map((d) => ` - "${d}"`));
   }
+  prompt.push(...data.punishments);
   if (data.memories.length > 0) {
     prompt.push('Things on your mind from recently:');
     prompt.push(...data.memories.map((m) => ` - ${m}`));
@@ -193,6 +196,7 @@ export const prayerPromptData = internalQuery({
       .filter((q) => q.or(q.eq(q.field('status'), 'accepted'), q.eq(q.field('status'), 'declined')))
       .first();
     const decrees = await activeDecrees(ctx.db, args.worldId);
+    const punishments = await punishmentPrompt(ctx.db, args.worldId, args.playerId);
     let lastAnswer;
     if (answered) {
       lastAnswer =
@@ -206,6 +210,7 @@ export const prayerPromptData = internalQuery({
       faith: faith?.score,
       lastAnswer,
       decrees: decrees.map((d) => d.text),
+      punishments,
       memories: memories.map((m) => m.description.slice(0, PRAYER_MEMORY_CHARS)),
     };
   },
@@ -300,7 +305,13 @@ export const prayerInbox = query({
         .collect()),
     ];
     return {
-      pending: pending.map(({ _id, name, night, text }) => ({ _id, name, night, text })),
+      pending: pending.map(({ _id, name, night, text, summary }) => ({
+        _id,
+        name,
+        night,
+        text,
+        summary,
+      })),
       praying: inProgress.map((p) => p.name),
     };
   },
@@ -322,5 +333,54 @@ export const faithScores = query({
       scores.push({ name: description?.name ?? row.playerId, score: row.score });
     }
     return { max: FAITH_MAX, start: FAITH_START, scores };
+  },
+});
+
+// Inbox button: boils each pending prayer down to one line, one prayer at a time.
+export const summarizePrayers = action({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }): Promise<number> => {
+    const prayers = await ctx.runQuery(selfInternal.unsummarizedPrayers, { worldId });
+    for (const prayer of prayers) {
+      const { content } = await chatCompletion({
+        messages: [
+          {
+            role: 'user',
+            content:
+              `Summarize this prayer by ${prayer.name} in one short line, in the form ` +
+              `"${prayer.name} wants <what> because <why>." Reply with only that line.\n` +
+              `Prayer: "${prayer.text}"`,
+          },
+        ],
+        max_tokens: 40,
+      });
+      const summary = content
+        .trim()
+        .replace(/^["“]|["”]$/g, '')
+        .split('\n')[0]
+        .trim();
+      if (summary) {
+        await ctx.runMutation(selfInternal.setSummary, { prayerId: prayer._id, summary });
+      }
+    }
+    return prayers.length;
+  },
+});
+
+export const unsummarizedPrayers = internalQuery({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }) => {
+    const pending = await ctx.db
+      .query('prayers')
+      .withIndex('status', (q) => q.eq('worldId', worldId).eq('status', 'pending'))
+      .collect();
+    return pending.filter((p) => !p.summary && p.text);
+  },
+});
+
+export const setSummary = internalMutation({
+  args: { prayerId: v.id('prayers'), summary: v.string() },
+  handler: async (ctx, { prayerId, summary }) => {
+    await ctx.db.patch(prayerId, { summary });
   },
 });

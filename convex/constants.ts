@@ -123,3 +123,13 @@ export const GOD_SPEECH_MAX_RADIUS = 20;
 export const GOD_SPEECH_AWE_DURATION = 30_000;
 export const GOD_SPEECH_IMPORTANCE = 9;
 export const FAITH_WITNESS = 5;
+
+// God mode: punishment. A struck character is stunned (⚡) for this long; anyone
+// within the radius sees it. Faith drops, and the punishment stays in their
+// prompts for this many game days.
+export const PUNISH_STUN_DURATION = 60_000;
+export const PUNISH_WITNESS_RADIUS = 8;
+export const PUNISH_FAITH = -5;
+export const PUNISH_IMPORTANCE = 9;
+export const PUNISH_WITNESS_IMPORTANCE = 8;
+export const PUNISHMENT_PROMPT_DAYS = 2;

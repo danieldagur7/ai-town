@@ -4,7 +4,13 @@ import { clockState, isSleepTime } from './clock';
 import { distance } from '../util/geometry';
 import { stopPlayer } from './movement';
 import { GOD_CHARACTER } from '../../data/characters';
-import { GOD_SPEECH_AWE_DURATION, GOD_SPEECH_MAX_RADIUS } from '../constants';
+import {
+  GOD_SPEECH_AWE_DURATION,
+  GOD_SPEECH_MAX_RADIUS,
+  PUNISH_STUN_DURATION,
+  PUNISH_WITNESS_RADIUS,
+} from '../constants';
+import { parseGameId, playerId } from './ids';
 
 // God mode controls, sent from the God menu in the UI.
 export const godModeInputs = {
@@ -58,6 +64,54 @@ export const godModeInputs = {
         godName: game.playerDescriptions.get(god.id)!.name,
         words,
         asleep,
+        witnesses,
+      });
+      return witnesses.length;
+    },
+  }),
+  // Lightning: the target is stunned on the spot and everyone nearby sees it.
+  punish: inputHandler({
+    args: {
+      playerId,
+      decreeId: v.optional(v.id('decrees')),
+      decreeText: v.optional(v.string()),
+      message: v.optional(v.string()),
+    },
+    handler: (game, now, args) => {
+      const targetId = parseGameId('players', args.playerId);
+      const target = game.world.players.get(targetId);
+      const agent = [...game.world.agents.values()].find((a) => a.playerId === targetId);
+      if (!target || !agent) {
+        throw new Error('Only townspeople can be punished');
+      }
+      game.world.playerConversation(target)?.leave(game, now, target);
+      stopPlayer(target);
+      target.activity = {
+        description: 'struck by lightning',
+        emoji: '⚡',
+        until: now + PUNISH_STUN_DURATION,
+      };
+      const witnesses = [];
+      for (const other of game.world.agents.values()) {
+        const player = game.world.players.get(other.playerId);
+        if (
+          !player ||
+          other.id === agent.id ||
+          distance(player.position, target.position) > PUNISH_WITNESS_RADIUS
+        ) {
+          continue;
+        }
+        witnesses.push({ playerId: player.id, agentId: other.id });
+      }
+      game.world.godSmite = { x: target.position.x, y: target.position.y, time: now };
+      game.scheduleOperation('rememberPunishment', {
+        worldId: game.worldId,
+        playerId: target.id,
+        agentId: agent.id,
+        name: game.playerDescriptions.get(target.id)!.name,
+        decreeId: args.decreeId,
+        decreeText: args.decreeText,
+        message: args.message?.trim() || undefined,
         witnesses,
       });
       return witnesses.length;

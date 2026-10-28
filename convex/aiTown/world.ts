@@ -20,6 +20,8 @@ export const serializedWorld = {
   agents: v.array(v.object(serializedAgent)),
   historicalLocations: v.optional(historicalLocations),
   clock: v.optional(serializedClock),
+  // Where and when the god last struck someone with lightning, for the UI.
+  godSmite: v.optional(v.object({ x: v.number(), y: v.number(), time: v.number() })),
   // Where and when the manifested god last spoke to the town, for the UI pulse.
   godSpeech: v.optional(
     v.object({ x: v.number(), y: v.number(), radius: v.number(), time: v.number() }),
@@ -35,13 +37,15 @@ export class World {
   historicalLocations?: Map<GameId<'players'>, ArrayBuffer>;
   clock?: Clock;
   godSpeech?: { x: number; y: number; radius: number; time: number };
+  godSmite?: { x: number; y: number; time: number };
 
   constructor(serialized: SerializedWorld) {
-    const { nextId, historicalLocations, clock, godSpeech } = serialized;
+    const { nextId, historicalLocations, clock, godSpeech, godSmite } = serialized;
 
     this.nextId = nextId;
     this.clock = clock;
     this.godSpeech = godSpeech;
+    this.godSmite = godSmite;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
     this.players = parseMap(serialized.players, Player, (p) => p.id);
     this.agents = parseMap(serialized.agents, Agent, (a) => a.id);
@@ -72,6 +76,7 @@ export class World {
         })),
       clock: this.clock,
       godSpeech: this.godSpeech,
+      godSmite: this.godSmite,
     };
   }
 }

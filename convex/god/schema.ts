@@ -23,6 +23,8 @@ export const godTables = {
     night: v.number(),
     status: prayerStatus,
     text: v.optional(v.string()),
+    // One-line "X wants Y because Z", made on demand from the inbox.
+    summary: v.optional(v.string()),
     requested: v.number(),
     generationStarted: v.optional(v.number()),
     godResponse: v.optional(v.string()),
@@ -49,6 +51,16 @@ export const godTables = {
     name: v.string(),
     text: v.string(),
   }).index('decreeId', ['decreeId']),
+
+  // Every time the god struck someone down.
+  punishments: defineTable({
+    worldId: v.id('worlds'),
+    playerId,
+    name: v.string(),
+    decreeId: v.optional(v.id('decrees')),
+    decreeText: v.optional(v.string()),
+    message: v.optional(v.string()),
+  }).index('worldId', ['worldId']),
 
   // Created the first time the god answers one of a character's prayers.
   faith: defineTable({
