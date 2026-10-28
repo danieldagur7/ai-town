@@ -32,6 +32,10 @@ export const memoryFields = {
       type: v.literal('prayer'),
       prayerId: v.id('prayers'),
     }),
+    // The player saw the god appear and speak.
+    v.object({
+      type: v.literal('godSpeech'),
+    }),
   ),
 };
 export const memoryTables = {

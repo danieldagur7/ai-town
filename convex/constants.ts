@@ -111,3 +111,15 @@ export const PRAYER_DECLINED_IMPORTANCE = 6;
 
 // God mode: decrees. At most this many active decrees (newest first) go into prompts.
 export const MAX_DECREES_IN_PROMPT = 3;
+
+// Conversation messages: token cap per line (the prompt also asks for 1-2 short sentences).
+export const MESSAGE_MAX_TOKENS = 80;
+
+// God mode: manifesting. Speaking to the town reaches characters within this
+// many tiles (adjustable in the God menu up to the max).
+export const GOD_SPEECH_DEFAULT_RADIUS = 6;
+export const GOD_SPEECH_MAX_RADIUS = 20;
+// Witnesses kneel (🙏) for this long, remember it at this importance, and gain faith.
+export const GOD_SPEECH_AWE_DURATION = 30_000;
+export const GOD_SPEECH_IMPORTANCE = 9;
+export const FAITH_WITNESS = 5;

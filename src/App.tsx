@@ -14,52 +14,54 @@ import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
 import GodMenu from './components/GodMenu.tsx';
+import { GodUiProvider } from './godUi.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
 
 export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-brown-900 font-body">
-      <ReactModal
-        isOpen={helpModalOpen}
-        onRequestClose={() => setHelpModalOpen(false)}
-        style={modalStyles}
-        contentLabel="Help modal"
-        ariaHideApp={false}
-      >
-        <div className="font-body">
-          <h1 className="text-center text-6xl font-bold font-display game-title">Help</h1>
-          <p>
-            Welcome to AI town. AI town supports both anonymous <i>spectators</i> and logged in{' '}
-            <i>interactivity</i>.
-          </p>
-          <h2 className="text-4xl mt-4">Spectating</h2>
-          <p>
-            Click and drag to move around the town, and scroll in and out to zoom. You can click on
-            an individual character to view its chat history.
-          </p>
-          <h2 className="text-4xl mt-4">Interactivity</h2>
-          <p>
-            If you log in, you can join the simulation and directly talk to different agents! After
-            logging in, click the "Interact" button, and your character will appear somewhere on the
-            map with a highlighted circle underneath you.
-          </p>
-          <p className="text-2xl mt-2">Controls:</p>
-          <p className="mt-4">Click to navigate around.</p>
-          <p className="mt-4">
-            To talk to an agent, click on them and then click "Start conversation," which will ask
-            them to start walking towards you. Once they're nearby, the conversation will start, and
-            you can speak to each other. You can leave at any time by closing the conversation pane
-            or moving away. They may propose a conversation to you - you'll see a button to accept
-            in the messages panel.
-          </p>
-          <p className="mt-4">
-            AI town only supports {MAX_HUMAN_PLAYERS} humans at a time. If you're idle for five
-            minutes, you'll be automatically removed from the simulation.
-          </p>
-        </div>
-      </ReactModal>
-      {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
+    <GodUiProvider>
+      <main className="relative h-screen w-screen overflow-clip bg-brown-900 font-body">
+        <ReactModal
+          isOpen={helpModalOpen}
+          onRequestClose={() => setHelpModalOpen(false)}
+          style={modalStyles}
+          contentLabel="Help modal"
+          ariaHideApp={false}
+        >
+          <div className="font-body">
+            <h1 className="text-center text-6xl font-bold font-display game-title">Help</h1>
+            <p>
+              Welcome to AI town. AI town supports both anonymous <i>spectators</i> and logged in{' '}
+              <i>interactivity</i>.
+            </p>
+            <h2 className="text-4xl mt-4">Spectating</h2>
+            <p>
+              Click and drag to move around the town, and scroll in and out to zoom. You can click
+              on an individual character to view its chat history.
+            </p>
+            <h2 className="text-4xl mt-4">Interactivity</h2>
+            <p>
+              If you log in, you can join the simulation and directly talk to different agents!
+              After logging in, click the "Interact" button, and your character will appear
+              somewhere on the map with a highlighted circle underneath you.
+            </p>
+            <p className="text-2xl mt-2">Controls:</p>
+            <p className="mt-4">Click to navigate around.</p>
+            <p className="mt-4">
+              To talk to an agent, click on them and then click "Start conversation," which will ask
+              them to start walking towards you. Once they're nearby, the conversation will start,
+              and you can speak to each other. You can leave at any time by closing the conversation
+              pane or moving away. They may propose a conversation to you - you'll see a button to
+              accept in the messages panel.
+            </p>
+            <p className="mt-4">
+              AI town only supports {MAX_HUMAN_PLAYERS} humans at a time. If you're idle for five
+              minutes, you'll be automatically removed from the simulation.
+            </p>
+          </div>
+        </ReactModal>
+        {/*<div className="p-3 absolute top-0 right-0 z-10 text-2xl">
         <Authenticated>
           <UserButton afterSignOutUrl="/ai-town" />
         </Authenticated>
@@ -69,25 +71,26 @@ export default function Home() {
         </Unauthenticated>
       </div> */}
 
-      <div className="absolute inset-0">
-        <Game />
-      </div>
+        <div className="absolute inset-0">
+          <Game />
+        </div>
 
-      <header className="absolute top-0 left-0 z-10 flex flex-wrap items-center gap-3 p-3 pointer-events-none">
-        <FreezeButton />
-        <MusicButton />
-        <Button href="https://github.com/a16z-infra/ai-town" imgUrl={starImg}>
-          Star
-        </Button>
-        <InteractButton />
-        <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
-          Help
-        </Button>
-        <GodMenu />
-        <ClockBadge />
-      </header>
-      <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
-    </main>
+        <header className="absolute top-0 left-0 z-10 flex flex-wrap items-center gap-3 p-3 pointer-events-none">
+          <FreezeButton />
+          <MusicButton />
+          <Button href="https://github.com/a16z-infra/ai-town" imgUrl={starImg}>
+            Star
+          </Button>
+          <InteractButton />
+          <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
+            Help
+          </Button>
+          <GodMenu />
+          <ClockBadge />
+        </header>
+        <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
+      </main>
+    </GodUiProvider>
   );
 }
 

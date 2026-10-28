@@ -20,6 +20,10 @@ export const serializedWorld = {
   agents: v.array(v.object(serializedAgent)),
   historicalLocations: v.optional(historicalLocations),
   clock: v.optional(serializedClock),
+  // Where and when the manifested god last spoke to the town, for the UI pulse.
+  godSpeech: v.optional(
+    v.object({ x: v.number(), y: v.number(), radius: v.number(), time: v.number() }),
+  ),
 };
 export type SerializedWorld = ObjectType<typeof serializedWorld>;
 
@@ -30,12 +34,14 @@ export class World {
   agents: Map<GameId<'agents'>, Agent>;
   historicalLocations?: Map<GameId<'players'>, ArrayBuffer>;
   clock?: Clock;
+  godSpeech?: { x: number; y: number; radius: number; time: number };
 
   constructor(serialized: SerializedWorld) {
-    const { nextId, historicalLocations, clock } = serialized;
+    const { nextId, historicalLocations, clock, godSpeech } = serialized;
 
     this.nextId = nextId;
     this.clock = clock;
+    this.godSpeech = godSpeech;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
     this.players = parseMap(serialized.players, Player, (p) => p.id);
     this.agents = parseMap(serialized.agents, Agent, (a) => a.id);
@@ -65,6 +71,7 @@ export class World {
           location,
         })),
       clock: this.clock,
+      godSpeech: this.godSpeech,
     };
   }
 }

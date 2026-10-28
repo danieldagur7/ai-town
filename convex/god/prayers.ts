@@ -1,7 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import {
   ActionCtx,
-  DatabaseWriter,
   internalAction,
   internalMutation,
   internalQuery,
@@ -12,7 +11,7 @@ import { Doc } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import { agentId, playerId } from '../aiTown/ids';
 import { chatCompletion, fetchEmbedding } from '../util/llm';
-import { faithDescription } from './faith';
+import { adjustFaith, faithDescription } from './faith';
 import { activeDecrees } from './decrees';
 import {
   FAITH_ANSWERED,
@@ -233,23 +232,15 @@ export const answerPrayer = mutation({
       godResponse,
       answered: Date.now(),
     });
-    await changeFaith(ctx.db, prayer, args.accept ? FAITH_ANSWERED : FAITH_IGNORED);
+    await adjustFaith(
+      ctx.db,
+      prayer.worldId,
+      prayer.playerId,
+      args.accept ? FAITH_ANSWERED : FAITH_IGNORED,
+    );
     await ctx.scheduler.runAfter(0, selfInternal.rememberAnswer, { prayerId: prayer._id });
   },
 });
-
-async function changeFaith(db: DatabaseWriter, prayer: Doc<'prayers'>, delta: number) {
-  const faith = await db
-    .query('faith')
-    .withIndex('playerId', (q) => q.eq('worldId', prayer.worldId).eq('playerId', prayer.playerId))
-    .first();
-  const score = Math.min(FAITH_MAX, Math.max(0, (faith?.score ?? FAITH_START) + delta));
-  if (faith) {
-    await db.patch(faith._id, { score });
-  } else {
-    await db.insert('faith', { worldId: prayer.worldId, playerId: prayer.playerId, score });
-  }
-}
 
 // Gives the character a memory of how its prayer was answered.
 export const rememberAnswer = internalAction({

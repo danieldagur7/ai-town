@@ -15,6 +15,8 @@ import { PositionIndicator } from './PositionIndicator.tsx';
 import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { Beds } from './Beds.tsx';
+import { SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
+import { GOD_CHARACTER } from '../../data/characters.ts';
 
 export const PixiGame = (props: {
   worldId: Id<'worlds'>;
@@ -24,6 +26,7 @@ export const PixiGame = (props: {
   width: number;
   height: number;
   setSelectedElement: SelectElement;
+  speechRadius: number | null;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -82,6 +85,9 @@ export const PixiGame = (props: {
   };
   const { width, height, tileDim } = props.game.worldMap;
   const players = [...props.game.world.players.values()];
+  const god = players.find(
+    (p) => p.human && props.game.playerDescriptions.get(p.id)?.character === GOD_CHARACTER,
+  );
 
   // Zoom on the user’s avatar when it is created
   useEffect(() => {
@@ -109,6 +115,17 @@ export const PixiGame = (props: {
         onpointerdown={onMapPointerDown}
       />
       <Beds tileDim={tileDim} />
+      {god && props.speechRadius !== null && (
+        <SpeechRadius
+          x={god.position.x}
+          y={god.position.y}
+          radius={props.speechRadius}
+          tileDim={tileDim}
+        />
+      )}
+      {props.game.world.godSpeech && (
+        <SpeechPulse speech={props.game.world.godSpeech} tileDim={tileDim} />
+      )}
       {players.map(
         (p) =>
           // Only show the path for the human player in non-debug mode.

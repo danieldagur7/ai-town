@@ -1,6 +1,6 @@
 import { Character } from './Character.tsx';
 import { orientationDegrees } from '../../convex/util/geometry.ts';
-import { characters } from '../../data/characters.ts';
+import { GOD_CHARACTER, characters, divineCharacter } from '../../data/characters.ts';
 import { toast } from 'react-toastify';
 import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
 import { GameId } from '../../convex/aiTown/ids.ts';
@@ -33,7 +33,8 @@ export const Player = ({
   if (!playerCharacter) {
     throw new Error(`Player ${player.id} has no character`);
   }
-  const character = characters.find((c) => c.name === playerCharacter);
+  const divine = playerCharacter === GOD_CHARACTER;
+  const character = divine ? divineCharacter : characters.find((c) => c.name === playerCharacter);
 
   const locationBuffer = game.world.historicalLocations?.get(player.id);
   const historicalLocation = useHistoricalValue<Location>(
@@ -83,6 +84,7 @@ export const Player = ({
         spritesheetData={character.spritesheetData}
         speed={character.speed}
         name={game.playerDescriptions.get(player.id)?.name}
+        divine={divine}
         onClick={() => {
           onClick({ kind: 'player', id: player.id });
         }}

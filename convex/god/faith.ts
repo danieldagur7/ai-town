@@ -1,4 +1,24 @@
-import { FAITH_MAX } from '../constants';
+import { DatabaseWriter } from '../_generated/server';
+import { Id } from '../_generated/dataModel';
+import { FAITH_MAX, FAITH_START } from '../constants';
+
+export async function adjustFaith(
+  db: DatabaseWriter,
+  worldId: Id<'worlds'>,
+  playerId: string,
+  delta: number,
+) {
+  const faith = await db
+    .query('faith')
+    .withIndex('playerId', (q) => q.eq('worldId', worldId).eq('playerId', playerId))
+    .first();
+  const score = Math.min(FAITH_MAX, Math.max(0, (faith?.score ?? FAITH_START) + delta));
+  if (faith) {
+    await db.patch(faith._id, { score });
+  } else {
+    await db.insert('faith', { worldId, playerId, score });
+  }
+}
 
 // How a character feels about the god, for prayer and conversation prompts.
 export function faithDescription(score: number) {

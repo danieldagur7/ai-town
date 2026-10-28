@@ -44,6 +44,7 @@ import type * as engine_abstractGame from "../engine/abstractGame.js";
 import type * as engine_historicalObject from "../engine/historicalObject.js";
 import type * as god_decrees from "../god/decrees.js";
 import type * as god_faith from "../god/faith.js";
+import type * as god_manifest from "../god/manifest.js";
 import type * as god_prayers from "../god/prayers.js";
 import type * as http from "../http.js";
 import type * as init from "../init.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   "engine/historicalObject": typeof engine_historicalObject;
   "god/decrees": typeof god_decrees;
   "god/faith": typeof god_faith;
+  "god/manifest": typeof god_manifest;
   "god/prayers": typeof god_prayers;
   http: typeof http;
   init: typeof init;

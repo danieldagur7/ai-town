@@ -12,6 +12,7 @@ import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
 import { DayNightOverlay } from './DayNightOverlay.tsx';
+import { useGodUi } from '../godUi.tsx';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 
@@ -36,6 +37,8 @@ export default function Game() {
   const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
+  // Pixi doesn't see React context, so pass the god UI state in as a prop.
+  const { speechRadius } = useGodUi();
   const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
 
   if (!worldId || !engineId || !game) {
@@ -68,6 +71,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     height={height}
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}
+                    speechRadius={speechRadius}
                   />
                 </ConvexProvider>
               </Stage>

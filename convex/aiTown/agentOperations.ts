@@ -4,6 +4,7 @@ import { WorldMap, serializedWorldMap } from './worldMap';
 import { rememberConversation } from '../agent/memory';
 import { GameId, agentId, conversationId, playerId } from './ids';
 import {
+  cleanMessage,
   continueConversationMessage,
   leaveConversationMessage,
   startConversationMessage,
@@ -77,7 +78,7 @@ export const agentGenerateMessage = internalAction({
       args.otherPlayerId as GameId<'players'>,
     );
     // TODO: stream in the text instead of reading it all at once.
-    const text = await completion.readAll();
+    const text = cleanMessage(await completion.readAll());
 
     await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
       worldId: args.worldId,

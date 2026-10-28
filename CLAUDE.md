@@ -66,6 +66,12 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
     skipped. Answering adjusts `faith` and adds a `prayer` memory via `rememberAnswer`.
   - Faith (`convex/god/faith.ts`): 0–100, starts at 50 on the first answer. Only then
     does a private faith line appear in that character's conversation prompts.
+  - Manifest (`convex/god/manifest.ts`, `godSpeaks` input in `convex/aiTown/godMode.ts`): the
+    player joins as character `god` (`divineCharacter` in `data/characters.ts`, recolored at
+    load by `src/divineTexture.ts`, halo/glow in `Character.tsx`), exempt from the idle
+    kick. Conversation prompts flag the god so characters recognize them. Speaking gives
+    everyone in radius a `godSpeech` memory, kneeling 🙏 and +faith; `world.godSpeech`
+    drives the pulse. The radius preview is shared via `src/godUi.tsx`.
   - Decrees (`convex/god/decrees.ts`): active decrees (newest `MAX_DECREES_IN_PROMPT`)
     are injected straight into conversation and prayer prompts via `decreesPrompt`,
     not left to memory search. After a conversation is remembered,

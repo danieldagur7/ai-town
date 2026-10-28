@@ -1,13 +1,18 @@
-import { useState } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useEffect, useState } from 'react';
+import { toast } from 'react-toastify';
+import { useConvex, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { useSendInput } from '../hooks/sendInput';
+import { useSendInput, waitForInput } from '../hooks/sendInput';
 import { toastOnError } from '../toasts';
 import Button from './buttons/Button';
 import sunImg from '../../assets/sun.svg';
 import skipImg from '../../assets/skip.svg';
 import closeImg from '../../assets/close.svg';
 import { Id } from '../../convex/_generated/dataModel';
+import { useServerGame } from '../hooks/serverGame';
+import { useGodUi } from '../godUi';
+import { GOD_CHARACTER } from '../../data/characters';
+import { GOD_SPEECH_DEFAULT_RADIUS, GOD_SPEECH_MAX_RADIUS } from '../../convex/constants';
 
 // The god's toolbox: a pop-up menu that collects the god-mode features.
 export default function GodMenu() {
@@ -43,7 +48,7 @@ function GodMenuPanel({
 }) {
   const skipToNextPhase = useSendInput(engineId, 'skipToNextPhase');
   return (
-    <div className="pointer-events-auto absolute left-3 top-full z-20 w-96 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-6rem)] overflow-y-auto border-8 border-brown-900 bg-brown-800 text-brown-100 shadow-2xl p-4 flex flex-col gap-5">
+    <div className="pointer-events-auto absolute left-3 top-full z-20 w-96 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-10rem)] overflow-y-auto border-8 border-brown-900 bg-brown-800 text-brown-100 shadow-2xl p-4 flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-display game-title">God Mode</h2>
         <a className="button text-white shadow-solid cursor-pointer" onClick={onClose}>
@@ -52,6 +57,7 @@ function GodMenuPanel({
           </span>
         </a>
       </div>
+      <Manifest worldId={worldId} engineId={engineId} />
       <PrayerInbox worldId={worldId} />
       <Decrees worldId={worldId} />
       <FaithScores worldId={worldId} />
@@ -65,6 +71,114 @@ function GodMenuPanel({
           Skip to next phase
         </Button>
       </section>
+    </div>
+  );
+}
+
+function Manifest({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'engines'> }) {
+  const convex = useConvex();
+  const game = useServerGame(worldId);
+  const humanToken = useQuery(api.world.userStatus, { worldId });
+  const manifest = useMutation(api.god.manifest.manifest);
+  const leave = useMutation(api.world.leaveWorld);
+  const [name, setName] = useState('The Light');
+  const [busy, setBusy] = useState(false);
+  const me = game && [...game.world.players.values()].find((p) => p.human === humanToken);
+  const manifested = !!me && game?.playerDescriptions.get(me.id)?.character === GOD_CHARACTER;
+
+  const appear = async () => {
+    setBusy(true);
+    try {
+      const inputId = await toastOnError(manifest({ worldId, name }));
+      await toastOnError(waitForInput(convex, inputId));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xl">Manifest</h3>
+      {manifested ? (
+        <>
+          <SpeakToTown engineId={engineId} />
+          <button
+            className="bg-brown-900 text-white text-sm py-1"
+            onClick={() => void toastOnError(leave({ worldId }))}
+          >
+            Withdraw from the town
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-brown-300">
+            Appear in the town in your divine form. Characters will know who you are.
+          </p>
+          <input
+            className="text-sm text-black bg-white p-2"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="The name you appear as"
+          />
+          <button
+            className="bg-clay-700 text-white text-lg py-1 disabled:opacity-50"
+            disabled={busy || !name.trim()}
+            onClick={() => void appear()}
+          >
+            Manifest
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
+function SpeakToTown({ engineId }: { engineId: Id<'engines'> }) {
+  const godSpeaks = useSendInput(engineId, 'godSpeaks');
+  const { setSpeechRadius } = useGodUi();
+  const [words, setWords] = useState('');
+  const [radius, setRadius] = useState(GOD_SPEECH_DEFAULT_RADIUS);
+  // Show the reach on the map while these controls are open.
+  useEffect(() => {
+    setSpeechRadius(radius);
+    return () => setSpeechRadius(null);
+  }, [radius]);
+  const speak = async () => {
+    const witnesses = await toastOnError(godSpeaks({ words, radius }));
+    toast.success(
+      witnesses === 0
+        ? 'Nobody was close enough to see you.'
+        : `${witnesses} ${witnesses === 1 ? 'person' : 'people'} saw you and heard your words.`,
+    );
+    setWords('');
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <textarea
+        className="text-sm text-black bg-white p-2 resize-none"
+        rows={2}
+        placeholder="What you say to those around you"
+        value={words}
+        onChange={(e) => setWords(e.target.value)}
+      />
+      <label className="text-sm flex items-center gap-2">
+        Reach
+        <input
+          type="range"
+          min={1}
+          max={GOD_SPEECH_MAX_RADIUS}
+          value={radius}
+          onChange={(e) => setRadius(Number(e.target.value))}
+          className="flex-1"
+        />
+        {radius} tiles
+      </label>
+      <button
+        className="bg-clay-700 text-white text-lg py-1 disabled:opacity-50"
+        disabled={!words.trim()}
+        onClick={() => void speak()}
+      >
+        Speak
+      </button>
     </div>
   );
 }

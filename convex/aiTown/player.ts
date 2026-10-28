@@ -13,7 +13,7 @@ import { pointsEqual, pathPosition } from '../util/geometry';
 import { Game } from './game';
 import { stopPlayer, findRoute, blocked, movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
-import { characters } from '../../data/characters';
+import { GOD_CHARACTER, characters } from '../../data/characters';
 import { PlayerDescription } from './playerDescription';
 
 const pathfinding = v.object({
@@ -82,7 +82,9 @@ export class Player {
   }
 
   tick(game: Game, now: number) {
-    if (this.human && this.lastInput < now - HUMAN_IDLE_TOO_LONG) {
+    // The manifested god stays until withdrawn; the god menu doesn't count as input.
+    const isGod = game.playerDescriptions.get(this.id)?.character === GOD_CHARACTER;
+    if (this.human && !isGod && this.lastInput < now - HUMAN_IDLE_TOO_LONG) {
       this.leave(game, now);
     }
   }
@@ -209,7 +211,7 @@ export class Player {
       { dx: 0, dy: -1 },
     ];
     const facing = facingOptions[Math.floor(Math.random() * facingOptions.length)];
-    if (!characters.find((c) => c.name === character)) {
+    if (character !== GOD_CHARACTER && !characters.find((c) => c.name === character)) {
       throw new Error(`Invalid character: ${character}`);
     }
     const playerId = game.allocId('players');

@@ -2,6 +2,7 @@ import { BaseTexture, ISpritesheetData, Spritesheet } from 'pixi.js';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatedSprite, Container, Graphics, Text } from '@pixi/react';
 import * as PIXI from 'pixi.js';
+import { divineBaseTexture } from '../divineTexture';
 
 export const Character = ({
   textureUrl,
@@ -16,6 +17,7 @@ export const Character = ({
   isViewer = false,
   speed = 0.1,
   name,
+  divine = false,
   onClick,
 }: {
   // Path to the texture packed image.
@@ -38,18 +40,20 @@ export const Character = ({
   speed?: number;
   // Shown above the character while hovered.
   name?: string;
+  // The god's manifested form: recolored robe, halo and glow.
+  divine?: boolean;
   onClick: () => void;
 }) => {
   const [spriteSheet, setSpriteSheet] = useState<Spritesheet>();
   const [hovered, setHovered] = useState(false);
   useEffect(() => {
     const parseSheet = async () => {
-      const sheet = new Spritesheet(
-        BaseTexture.from(textureUrl, {
-          scaleMode: PIXI.SCALE_MODES.NEAREST,
-        }),
-        spritesheetData,
-      );
+      const base = divine
+        ? await divineBaseTexture(textureUrl)
+        : BaseTexture.from(textureUrl, {
+            scaleMode: PIXI.SCALE_MODES.NEAREST,
+          });
+      const sheet = new Spritesheet(base, spritesheetData);
       await sheet.parse();
       setSpriteSheet(sheet);
     };
@@ -106,6 +110,7 @@ export const Character = ({
         <Text x={18} y={-10} scale={0.8} text={'💬'} anchor={{ x: 0.5, y: 0.5 }} />
       )}
       {isViewer && <ViewerIndicator />}
+      {divine && <DivineGlow />}
       <AnimatedSprite
         ref={ref}
         isPlaying={isMoving}
@@ -116,6 +121,7 @@ export const Character = ({
       {emoji && (
         <Text x={0} y={-24} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
       )}
+      {divine && <Halo />}
       {hovered && name && <NameLabel name={name} y={emoji ? -40 : -26} />}
     </Container>
   );
@@ -147,6 +153,28 @@ function NameLabel({ name, y }: { name: string; y: number }) {
       <Text text={name} style={nameStyle} anchor={{ x: 0.5, y: 0.5 }} resolution={2} />
     </Container>
   );
+}
+
+function DivineGlow() {
+  const draw = useCallback((g: PIXI.Graphics) => {
+    g.clear();
+    // Soft light on the ground, brighter towards the middle.
+    for (let i = 0; i < 5; i++) {
+      g.beginFill(0xffe9a0, 0.08);
+      g.drawEllipse(0, 12, 26 - i * 4, 12 - i * 2);
+      g.endFill();
+    }
+  }, []);
+  return <Graphics draw={draw} />;
+}
+
+function Halo() {
+  const draw = useCallback((g: PIXI.Graphics) => {
+    g.clear();
+    g.lineStyle(2, 0xffd34d, 0.95);
+    g.drawEllipse(0, -19, 8, 3);
+  }, []);
+  return <Graphics draw={draw} />;
 }
 
 function ViewerIndicator() {

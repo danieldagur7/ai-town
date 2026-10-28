@@ -6,11 +6,30 @@ import * as memory from './memory';
 import { api, internal } from '../_generated/api';
 import * as embeddingsCache from './embeddingsCache';
 import { GameId, conversationId, playerId } from '../aiTown/ids';
-import { NUM_MEMORIES_TO_SEARCH } from '../constants';
+import { MESSAGE_MAX_TOKENS, NUM_MEMORIES_TO_SEARCH } from '../constants';
+import { DAY_LENGTH, clockState, formatClock } from '../aiTown/clock';
 import { faithDescription } from '../god/faith';
+import { GOD_CHARACTER } from '../../data/characters';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
 
 const selfInternal = internal.agent.conversation;
+
+// Keep chat snappy: short spoken lines, no narration.
+const CHAT_STYLE =
+  'Reply with one or two short sentences (under 25 words), like natural spoken chat. ' +
+  'No narration, no actions in asterisks or parentheses, no quotation marks.';
+
+// Strips stage directions and stray formatting the model adds despite CHAT_STYLE.
+export function cleanMessage(text: string) {
+  const cleaned = text
+    .replace(/^\s*[A-Z][\w ]{0,20}:\s*/, '')
+    .replace(/\*[^*]*\*/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/["“”]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || text.trim();
+}
 
 export async function startConversationMessage(
   ctx: ActionCtx,
@@ -19,15 +38,13 @@ export async function startConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, agent, otherAgent, lastConversation, decrees } = await ctx.runQuery(
-    selfInternal.queryPromptData,
-    {
+  const { player, otherPlayer, agent, otherAgent, lastConversation, decrees, timeOfDay } =
+    await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
       otherPlayerId,
       conversationId,
-    },
-  );
+    });
   const embedding = await embeddingsCache.fetch(
     ctx,
     `${player.name} is talking to ${otherPlayer.name}`,
@@ -45,6 +62,7 @@ export async function startConversationMessage(
   );
   const prompt = [
     `You are ${player.name}, and you just started a conversation with ${otherPlayer.name}.`,
+    timeOfDay,
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...decreesPrompt(decrees));
@@ -55,6 +73,7 @@ export async function startConversationMessage(
       `Be sure to include some detail or question about a previous conversation in your greeting.`,
     );
   }
+  prompt.push(CHAT_STYLE);
   prompt.push(`${player.name}:`);
 
   const { content } = await chatCompletion({
@@ -64,7 +83,7 @@ export async function startConversationMessage(
         content: prompt.join('\n'),
       },
     ],
-    max_tokens: 300,
+    max_tokens: MESSAGE_MAX_TOKENS,
     stream: true,
     stop: stopWords(otherPlayer.name, player.name),
   });
@@ -78,32 +97,34 @@ export async function continueConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent, decrees } = await ctx.runQuery(
-    selfInternal.queryPromptData,
-    {
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees, timeOfDay } =
+    await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
       otherPlayerId,
       conversationId,
-    },
-  );
-  const now = Date.now();
-  const started = new Date(conversation.created);
+    });
   const embedding = await embeddingsCache.fetch(
     ctx,
     `What do you think about ${otherPlayer.name}?`,
   );
-  const memories = await memory.searchMemories(ctx, player.id as GameId<'players'>, embedding, 3);
+  const memories = await memory.searchMemories(
+    ctx,
+    player.id as GameId<'players'>,
+    embedding,
+    Number(process.env.NUM_MEMORIES_TO_SEARCH) || NUM_MEMORIES_TO_SEARCH,
+  );
   const prompt = [
     `You are ${player.name}, and you're currently in a conversation with ${otherPlayer.name}.`,
-    `The conversation started at ${started.toLocaleString()}. It's now ${now.toLocaleString()}.`,
+    timeOfDay,
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...decreesPrompt(decrees));
   prompt.push(...relatedMemoriesPrompt(memories));
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
-    `DO NOT greet them again. Do NOT use the word "Hey" too often. Your response should be brief and within 200 characters.`,
+    `DO NOT greet them again. Do NOT use the word "Hey" too often.`,
+    CHAT_STYLE,
   );
 
   const llmMessages: LLMMessage[] = [
@@ -123,7 +144,7 @@ export async function continueConversationMessage(
 
   const { content } = await chatCompletion({
     messages: llmMessages,
-    max_tokens: 300,
+    max_tokens: MESSAGE_MAX_TOKENS,
     stream: true,
     stop: stopWords(otherPlayer.name, player.name),
   });
@@ -137,15 +158,13 @@ export async function leaveConversationMessage(
   playerId: GameId<'players'>,
   otherPlayerId: GameId<'players'>,
 ) {
-  const { player, otherPlayer, conversation, agent, otherAgent, decrees } = await ctx.runQuery(
-    selfInternal.queryPromptData,
-    {
+  const { player, otherPlayer, conversation, agent, otherAgent, decrees, timeOfDay } =
+    await ctx.runQuery(selfInternal.queryPromptData, {
       worldId,
       playerId,
       otherPlayerId,
       conversationId,
-    },
-  );
+    });
   const prompt = [
     `You are ${player.name}, and you're currently in a conversation with ${otherPlayer.name}.`,
     `You've decided to leave the question and would like to politely tell them you're leaving the conversation.`,
@@ -154,7 +173,8 @@ export async function leaveConversationMessage(
   prompt.push(...decreesPrompt(decrees));
   prompt.push(
     `Below is the current chat history between you and ${otherPlayer.name}.`,
-    `How would you like to tell them that you're leaving? Your response should be brief and within 200 characters.`,
+    `How would you like to tell them that you're leaving?`,
+    CHAT_STYLE,
   );
   const llmMessages: LLMMessage[] = [
     {
@@ -173,7 +193,7 @@ export async function leaveConversationMessage(
 
   const { content } = await chatCompletion({
     messages: llmMessages,
-    max_tokens: 300,
+    max_tokens: MESSAGE_MAX_TOKENS,
     stream: true,
     stop: stopWords(otherPlayer.name, player.name),
   });
@@ -181,7 +201,7 @@ export async function leaveConversationMessage(
 }
 
 function agentPrompts(
-  otherPlayer: { name: string },
+  otherPlayer: { name: string; isGod?: boolean },
   agent: { identity: string; plan: string; faith?: number } | null,
   otherAgent: { identity: string; plan: string } | null,
 ): string[] {
@@ -199,6 +219,14 @@ function agentPrompts(
   if (otherAgent) {
     prompt.push(`About ${otherPlayer.name}: ${otherAgent.identity}`);
   }
+  if (otherPlayer.isGod) {
+    prompt.push(
+      `${otherPlayer.name} is the unseen god of this town, standing in front of you in person, ` +
+        `glowing with a halo. You recognize them at once. React the way you truly would: ` +
+        `awe, fear, gratitude, doubt or a grudge, depending on who you are and how the god has treated you. ` +
+        `Talk to them as your god, and answer what they actually say.`,
+    );
+  }
   return prompt;
 }
 
@@ -208,13 +236,10 @@ function previousConversationPrompt(
 ): string[] {
   const prompt = [];
   if (conversation) {
-    const prev = new Date(conversation.created);
-    const now = new Date();
-    prompt.push(
-      `Last time you chatted with ${
-        otherPlayer.name
-      } it was ${prev.toLocaleString()}. It's now ${now.toLocaleString()}.`,
-    );
+    // Real time since then, in game days.
+    const days = Math.floor((Date.now() - conversation.created) / DAY_LENGTH);
+    const when = days === 0 ? 'earlier today' : days === 1 ? 'yesterday' : `${days} days ago`;
+    prompt.push(`You last chatted with ${otherPlayer.name} ${when}.`);
   }
   return prompt;
 }
@@ -339,9 +364,17 @@ export const queryPromptData = internalQuery({
       .withIndex('playerId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
     const decrees = await activeDecrees(ctx.db, args.worldId);
+    const clock = world.clock && clockState(world.clock.elapsed);
+    const timeOfDay = clock
+      ? `It's ${clock.phase} (${formatClock(clock)}) on day ${clock.day}.`
+      : `It's daytime.`;
     return {
       player: { name: playerDescription.name, ...player },
-      otherPlayer: { name: otherPlayerDescription.name, ...otherPlayer },
+      otherPlayer: {
+        name: otherPlayerDescription.name,
+        isGod: otherPlayerDescription.character === GOD_CHARACTER,
+        ...otherPlayer,
+      },
       conversation,
       agent: {
         identity: agentDescription.identity,
@@ -356,6 +389,7 @@ export const queryPromptData = internalQuery({
       },
       lastConversation,
       decrees: decrees.map((d) => d.text),
+      timeOfDay,
     };
   },
 });

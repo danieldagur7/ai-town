@@ -131,5 +131,16 @@ export const characters = [
   },
 ];
 
+// The god's form when they manifest in the town: the f4 elder, recolored into a
+// white-and-gold robe at load time (src/divineTexture.ts). Kept out of
+// `characters` so normal players never get it at random.
+export const GOD_CHARACTER = 'god';
+export const divineCharacter = {
+  name: GOD_CHARACTER,
+  textureUrl: '/ai-town/assets/32x32folk.png',
+  spritesheetData: f4SpritesheetData,
+  speed: 0.1,
+};
+
 // Characters move at 0.75 tiles per second.
 export const movementSpeed = 0.75;
