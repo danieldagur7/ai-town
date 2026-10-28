@@ -12,6 +12,8 @@ import MusicButton from './components/buttons/MusicButton.tsx';
 import Button from './components/buttons/Button.tsx';
 import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
+import ClockBadge from './components/ClockBadge.tsx';
+import GodMenu from './components/GodMenu.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
 
 export default function Home() {
@@ -82,6 +84,8 @@ export default function Home() {
         <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
           Help
         </Button>
+        <GodMenu />
+        <ClockBadge />
       </header>
       <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
     </main>

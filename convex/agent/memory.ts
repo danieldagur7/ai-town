@@ -33,6 +33,12 @@ export async function rememberConversation(
     playerId,
     conversationId,
   });
+  // A conversation that started and ended within one engine step is never
+  // archived, so there's nothing to remember.
+  if (!data) {
+    console.debug(`Conversation ${conversationId} was never archived, skipping memory`);
+    return;
+  }
   const { player, otherPlayer } = data;
   const messages = await ctx.runQuery(selfInternal.loadMessages, { worldId, conversationId });
   if (!messages.length) {
@@ -112,7 +118,7 @@ export const loadConversation = internalQuery({
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('id', args.conversationId))
       .first();
     if (!conversation) {
-      throw new Error(`Conversation ${args.conversationId} not found`);
+      return null;
     }
     const otherParticipator = await ctx.db
       .query('participatedTogether')

@@ -25,6 +25,7 @@ import { internal } from '../_generated/api';
 import { HistoricalObject } from '../engine/historicalObject';
 import { AgentDescription, serializedAgentDescription } from './agentDescription';
 import { parseMap, serializeMap } from '../util/object';
+import { advanceClock } from './clock';
 
 const gameState = v.object({
   world: v.object(serializedWorld),
@@ -175,6 +176,7 @@ export class Game extends AbstractGame {
   }
 
   tick(now: number) {
+    this.world.clock = advanceClock(this.world.clock, now);
     for (const player of this.world.players.values()) {
       player.tick(this, now);
     }

@@ -20,8 +20,14 @@ import { FunctionArgs } from 'convex/server';
 import { MutationCtx, internalMutation, internalQuery } from '../_generated/server';
 import { distance } from '../util/geometry';
 import { internal } from '../_generated/api';
-import { movePlayer } from './movement';
+import { movePlayer, stopPlayer } from './movement';
 import { insertInput } from './insertInput';
+import { DAY_LENGTH, isSleepTime, isWindDown } from './clock';
+import { bedFor } from './beds';
+import { Player } from './player';
+import { BED_WALK_TIMEOUT } from '../constants';
+
+const SLEEPING = 'sleeping';
 
 export class Agent {
   id: GameId<'agents'>;
@@ -34,9 +40,12 @@ export class Agent {
     operationId: string;
     started: number;
   };
+  // Set when the agent starts heading to bed, cleared on waking.
+  bedtimeStarted?: number;
 
   constructor(serialized: SerializedAgent) {
-    const { id, lastConversation, lastInviteAttempt, inProgressOperation } = serialized;
+    const { id, lastConversation, lastInviteAttempt, inProgressOperation, bedtimeStarted } =
+      serialized;
     const playerId = parseGameId('players', serialized.playerId);
     this.id = parseGameId('agents', id);
     this.playerId = playerId;
@@ -47,6 +56,7 @@ export class Agent {
     this.lastConversation = lastConversation;
     this.lastInviteAttempt = lastInviteAttempt;
     this.inProgressOperation = inProgressOperation;
+    this.bedtimeStarted = bedtimeStarted;
   }
 
   tick(game: Game, now: number) {
@@ -56,13 +66,37 @@ export class Agent {
     }
     if (this.inProgressOperation) {
       if (now < this.inProgressOperation.started + ACTION_TIMEOUT) {
-        // Wait on the operation to finish.
+        // Wait on the operation to finish. Operations run in the background
+        // (e.g. remembering a conversation), so keep heading to bed meanwhile.
+        this.tickBedtime(game, now, player);
         return;
       }
       console.log(`Timing out ${JSON.stringify(this.inProgressOperation)}`);
       delete this.inProgressOperation;
     }
+    if (isSleepTime(game.world)) {
+      this.tickNight(game, now, player);
+      return;
+    }
     const conversation = game.world.playerConversation(player);
+    // Late evening: finish any conversation, then head home before dark.
+    if (isWindDown(game.world) && !conversation) {
+      if (this.toRemember) {
+        this.startRemembering(game, now);
+      } else {
+        this.walkToBed(game, now, player);
+      }
+      return;
+    }
+    if (this.bedtimeStarted !== undefined) {
+      console.log(`Agent ${this.id} waking up`);
+      delete this.bedtimeStarted;
+      if (player.activity?.description === SLEEPING) {
+        delete player.activity;
+      }
+      // Don't keep walking to bed after waking up.
+      stopPlayer(player);
+    }
     const member = conversation?.participants.get(player.id);
 
     const recentlyAttemptedInvite =
@@ -79,12 +113,16 @@ export class Agent {
       this.startOperation(game, now, 'agentDoSomething', {
         worldId: game.worldId,
         player: player.serialize(),
-        otherFreePlayers: [...game.world.players.values()]
-          .filter((p) => p.id !== player.id)
-          .filter(
-            (p) => ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)),
-          )
-          .map((p) => p.serialize()),
+        // Late in the evening, wind down instead of inviting anyone new.
+        otherFreePlayers: isWindDown(game.world)
+          ? []
+          : [...game.world.players.values()]
+              .filter((p) => p.id !== player.id)
+              .filter(
+                (p) =>
+                  ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)),
+              )
+              .map((p) => p.serialize()),
         agent: this.serialize(),
         map: game.worldMap.serialize(),
       });
@@ -92,15 +130,7 @@ export class Agent {
     }
     // Check to see if we have a conversation we need to remember.
     if (this.toRemember) {
-      // Fire off the action to remember the conversation.
-      console.log(`Agent ${this.id} remembering conversation ${this.toRemember}`);
-      this.startOperation(game, now, 'agentRememberConversation', {
-        worldId: game.worldId,
-        playerId: this.playerId,
-        agentId: this.id,
-        conversationId: this.toRemember,
-      });
-      delete this.toRemember;
+      this.startRemembering(game, now);
       return;
     }
     if (conversation && member) {
@@ -235,6 +265,79 @@ export class Agent {
     }
   }
 
+  startRemembering(game: Game, now: number) {
+    // Fire off the action to remember the conversation.
+    console.log(`Agent ${this.id} remembering conversation ${this.toRemember}`);
+    this.startOperation(game, now, 'agentRememberConversation', {
+      worldId: game.worldId,
+      playerId: this.playerId,
+      agentId: this.id,
+      conversationId: this.toRemember!,
+    });
+    delete this.toRemember;
+  }
+
+  // Night: leave any conversation, remember it, walk to bed and sleep.
+  tickNight(game: Game, now: number, player: Player) {
+    const conversation = game.world.playerConversation(player);
+    if (conversation) {
+      console.log(`Agent ${this.id} leaving ${conversation.id} for the night`);
+      conversation.leave(game, now, player);
+      return;
+    }
+    if (this.toRemember) {
+      this.startRemembering(game, now);
+      return;
+    }
+    this.goToSleep(game, now, player);
+  }
+
+  // Bedtime movement that's safe to run while an operation is in flight.
+  tickBedtime(game: Game, now: number, player: Player) {
+    if (game.world.playerConversation(player)) {
+      return;
+    }
+    if (isSleepTime(game.world)) {
+      this.goToSleep(game, now, player);
+    } else if (isWindDown(game.world)) {
+      this.walkToBed(game, now, player);
+    }
+  }
+
+  goToSleep(game: Game, now: number, player: Player) {
+    if (player.activity?.description === SLEEPING) {
+      return;
+    }
+    if (this.walkToBed(game, now, player)) {
+      stopPlayer(player);
+      // Waking clears this, so `until` just needs to outlast the night.
+      player.activity = { description: SLEEPING, emoji: '😴', until: now + DAY_LENGTH };
+    }
+  }
+
+  // Walks towards the agent's bed. Returns true once it's there, or once it
+  // has given up after BED_WALK_TIMEOUT.
+  walkToBed(game: Game, now: number, player: Player): boolean {
+    if (this.bedtimeStarted === undefined) {
+      console.log(`Agent ${this.id} heading to bed`);
+      this.bedtimeStarted = now;
+      delete player.activity;
+    }
+    const bed = bedFor(game, player.id);
+    if (!bed || distance(player.position, bed) < 0.1) {
+      return true;
+    }
+    if (now > this.bedtimeStarted + BED_WALK_TIMEOUT) {
+      console.log(`Agent ${this.id} couldn't reach its bed, sleeping where it is`);
+      return true;
+    }
+    const dest = player.pathfinding?.destination;
+    if (!dest || dest.x !== bed.x || dest.y !== bed.y) {
+      movePlayer(game, now, player, bed);
+    }
+    return false;
+  }
+
   startOperation<Name extends keyof AgentOperations>(
     game: Game,
     now: number,
@@ -264,6 +367,7 @@ export class Agent {
       lastConversation: this.lastConversation,
       lastInviteAttempt: this.lastInviteAttempt,
       inProgressOperation: this.inProgressOperation,
+      bedtimeStarted: this.bedtimeStarted,
     };
   }
 }
@@ -281,6 +385,7 @@ export const serializedAgent = {
       started: v.number(),
     }),
   ),
+  bedtimeStarted: v.optional(v.number()),
 };
 export type SerializedAgent = ObjectType<typeof serializedAgent>;
 

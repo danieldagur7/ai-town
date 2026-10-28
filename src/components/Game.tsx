@@ -11,6 +11,7 @@ import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { DebugTimeManager } from './DebugTimeManager.tsx';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
+import { DayNightOverlay } from './DayNightOverlay.tsx';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 
@@ -72,6 +73,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
               </Stage>
             </div>
           </div>
+          {game.world.clock && <DayNightOverlay clock={game.world.clock} />}
         </div>
         {/* Pop-up details panel, shown when an agent is selected */}
         {showDetails && (

@@ -8,6 +8,7 @@ import { point } from '../util/types';
 import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
+import { isSleepTime, isWindDown } from './clock';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -55,6 +56,10 @@ export const agentInputs = {
         return null;
       }
       delete agent.inProgressOperation;
+      // Plans made before bedtime are dropped; the agent is going to bed.
+      if (isSleepTime(game.world) || isWindDown(game.world)) {
+        return null;
+      }
       const player = game.world.players.get(agent.playerId)!;
       if (args.invitee) {
         const inviteeId = parseGameId('players', args.invitee);
@@ -92,11 +97,6 @@ export const agentInputs = {
       if (!player) {
         throw new Error(`Couldn't find player: ${agent.playerId}`);
       }
-      const conversationId = parseGameId('conversations', args.conversationId);
-      const conversation = game.world.conversations.get(conversationId);
-      if (!conversation) {
-        throw new Error(`Couldn't find conversation: ${conversationId}`);
-      }
       if (
         !agent.inProgressOperation ||
         agent.inProgressOperation.operationId !== args.operationId
@@ -105,6 +105,15 @@ export const agentInputs = {
         return null;
       }
       delete agent.inProgressOperation;
+      const conversationId = parseGameId('conversations', args.conversationId);
+      const conversation = game.world.conversations.get(conversationId);
+      // The conversation can end while the message is being generated (e.g. the
+      // other player left, or night fell). Clear the operation either way so the
+      // agent isn't stuck until ACTION_TIMEOUT.
+      if (!conversation) {
+        console.debug(`Conversation ${conversationId} ended before ${agentId}'s message arrived`);
+        return null;
+      }
       conversationInputs.finishSendingMessage.handler(game, now, {
         playerId: agent.playerId,
         conversationId: args.conversationId,

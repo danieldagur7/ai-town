@@ -4,6 +4,7 @@ import { Player, serializedPlayer } from './player';
 import { Agent, serializedAgent } from './agent';
 import { GameId, parseGameId, playerId } from './ids';
 import { parseMap } from '../util/object';
+import { Clock, serializedClock } from './clock';
 
 export const historicalLocations = v.array(
   v.object({
@@ -18,6 +19,7 @@ export const serializedWorld = {
   players: v.array(v.object(serializedPlayer)),
   agents: v.array(v.object(serializedAgent)),
   historicalLocations: v.optional(historicalLocations),
+  clock: v.optional(serializedClock),
 };
 export type SerializedWorld = ObjectType<typeof serializedWorld>;
 
@@ -27,11 +29,13 @@ export class World {
   players: Map<GameId<'players'>, Player>;
   agents: Map<GameId<'agents'>, Agent>;
   historicalLocations?: Map<GameId<'players'>, ArrayBuffer>;
+  clock?: Clock;
 
   constructor(serialized: SerializedWorld) {
-    const { nextId, historicalLocations } = serialized;
+    const { nextId, historicalLocations, clock } = serialized;
 
     this.nextId = nextId;
+    this.clock = clock;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
     this.players = parseMap(serialized.players, Player, (p) => p.id);
     this.agents = parseMap(serialized.agents, Agent, (a) => a.id);
@@ -60,6 +64,7 @@ export class World {
           playerId,
           location,
         })),
+      clock: this.clock,
     };
   }
 }

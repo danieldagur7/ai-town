@@ -76,3 +76,21 @@ export const ENGINE_ACTION_DURATION = 30000;
 export const MAX_PATHFINDS_PER_STEP = 16;
 
 export const DEFAULT_NAME = 'Me';
+
+// Day/night clock. Real milliseconds spent in each phase; a full day
+// is their sum (8 minutes by default). The clock only runs while the engine does.
+export const MORNING_DURATION = 90_000;
+export const DAY_DURATION = 180_000;
+export const EVENING_DURATION = 90_000;
+export const NIGHT_DURATION = 120_000;
+
+// Agents stop starting new conversations for the last part of the evening.
+export const EVENING_WIND_DOWN = 45_000;
+
+// Agents start walking to bed at the wind-down. If one hasn't arrived this long
+// after setting off, it sleeps where it stands.
+export const BED_WALK_TIMEOUT = 90_000;
+
+// Cap on how far the clock moves in one tick, so restarting a stopped world
+// doesn't skip ahead.
+export const MAX_CLOCK_TICK = 1000;

@@ -39,8 +39,8 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   `runStep` is a scheduled action that loads the world, then every `stepDuration` (1s)
   runs up to 600 ticks of `tickDuration` 16ms, feeding queued inputs in by timestamp,
   and saves a diff with `saveWorld`. It reschedules itself every `ENGINE_ACTION_DURATION`
-  (30s). A `generationNumber` guarantees only one runner per world. Time is real
-  wall-clock ms (`Date.now()`); there is no game clock, day/night or sleep.
+  (30s). A `generationNumber` guarantees only one runner per world. Engine time is
+  real wall-clock ms (`Date.now()`).
   Crons (`convex/crons.ts`) stop idle worlds (`IDLE_WORLD_TIMEOUT`, 5 min without a
   browser heartbeat) and restart dead ones.
 - **Tick order** (`Game.tick`): players `tick` → `tickPathfinding` → `tickPosition` →
@@ -50,6 +50,15 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   `inputs[name].handler` (`convex/aiTown/inputs.ts` merges `player.ts`,
   `conversation.ts`, `agentInputs.ts`) → return value written back; the client waits
   on `aiTown/main:inputStatus`. Actions use `api.aiTown.main.sendInput`.
+- **Day/night** (`convex/aiTown/clock.ts`, always on): `world.clock.elapsed` advances in
+  `Game.tick` (capped per tick, so stopped worlds don't skip ahead). Phases and
+  durations are in `convex/constants.ts`; beds are in `data/beds.ts` (looked up by
+  `convex/aiTown/beds.ts`). In the evening wind-down agents stop inviting and walk to
+  bed; at night `Agent.tickNight` ends conversations, remembers them, and sleeps
+  (activity `sleeping` 😴); they wake on the next morning. UI: `ClockBadge`,
+  `DayNightOverlay`, `Beds`.
+- **God mode** (`convex/aiTown/godMode.ts`, `src/components/GodMenu.tsx`): a pop-up menu
+  in the toolbar collecting god features as engine inputs. Currently: skip to next phase.
 - **Agents** (`convex/aiTown/agent.ts`): `Agent.tick` is rule-based (wander/activity,
   invite, accept/reject, walk over, talk, leave, remember). Anything slow is an
   operation (`startOperation` → `convex/aiTown/agentOperations.ts` internalAction),
