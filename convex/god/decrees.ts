@@ -1,3 +1,4 @@
+import { yieldToPlayer } from '../priority';
 import { ConvexError, v } from 'convex/values';
 import {
   DatabaseReader,
@@ -143,6 +144,7 @@ export const summarizeDecreeTalk = internalAction({
     transcript: v.array(v.object({ author: v.string(), text: v.string() })),
   },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId);
     const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, {
       worldId: args.worldId,
     });
@@ -204,6 +206,7 @@ export const summarizeGroupDecreeTalk = internalAction({
     transcript: v.array(v.object({ author: v.string(), text: v.string() })),
   },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId);
     const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, { worldId: args.worldId });
     const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
     for (const decree of decrees) {

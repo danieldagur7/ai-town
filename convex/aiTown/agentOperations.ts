@@ -1,3 +1,4 @@
+import { yieldToPlayer } from '../priority';
 import { v } from 'convex/values';
 import { internalAction } from '../_generated/server';
 import { WorldMap, serializedWorldMap } from './worldMap';
@@ -35,6 +36,7 @@ export const agentRememberConversation = internalAction({
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId);
     await rememberConversation(
       ctx,
       args.worldId,
@@ -66,6 +68,8 @@ export const agentGenerateMessage = internalAction({
     messageUuid: v.string(),
   },
   handler: async (ctx, args) => {
+    // Townspeople chatting among themselves let the player's conversation go first.
+    await yieldToPlayer(ctx, args.worldId, args.conversationId);
     let completionFn;
     switch (args.type) {
       case 'start':
@@ -250,6 +254,7 @@ export const agentGatheringMessage = internalAction({
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId, args.gatheringId);
     let text;
     try {
       text = await gatheringMessage(ctx, args.worldId, args.gatheringId, args.playerId);

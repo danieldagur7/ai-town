@@ -63,6 +63,7 @@ import type * as init from "../init.js";
 import type * as life from "../life.js";
 import type * as messages from "../messages.js";
 import type * as music from "../music.js";
+import type * as priority from "../priority.js";
 import type * as society from "../society.js";
 import type * as testing from "../testing.js";
 import type * as townMap from "../townMap.js";
@@ -138,6 +139,7 @@ declare const fullApi: ApiFromModules<{
   life: typeof life;
   messages: typeof messages;
   music: typeof music;
+  priority: typeof priority;
   society: typeof society;
   testing: typeof testing;
   townMap: typeof townMap;

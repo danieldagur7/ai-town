@@ -1,3 +1,4 @@
+import { yieldToPlayer } from '../priority';
 import { v } from 'convex/values';
 import {
   ActionCtx,
@@ -185,6 +186,7 @@ export const rememberGathering = internalAction({
     if (messages.length === 0) {
       return;
     }
+    await yieldToPlayer(ctx, args.worldId);
     const names = [...new Set(messages.map((m) => m.authorName))];
     const what = args.kind === 'meeting' ? `a town meeting about "${args.topic}"` : 'a group chat';
     const { content } = await chatCompletion({
@@ -239,6 +241,7 @@ export const rememberGathering = internalAction({
 export const considerTownMeeting = internalAction({
   args: { worldId: v.id('worlds'), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId);
     const data = await ctx.runQuery(selfInternal.meetingContext, { worldId: args.worldId });
     if (!data || data.alreadyMetToday || data.townspeople.length < 3) {
       return;

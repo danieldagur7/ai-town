@@ -1,3 +1,4 @@
+import { yieldToPlayer } from '../priority';
 import { ConvexError, v } from 'convex/values';
 import {
   action,
@@ -140,6 +141,7 @@ export const processQueue = internalAction({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, { worldId }) => {
     for (;;) {
+      await yieldToPlayer(ctx, worldId);
       const prayer = await ctx.runMutation(selfInternal.claimNext, { worldId });
       if (!prayer) {
         return;
@@ -318,6 +320,7 @@ async function applyAnswer(
 export const autoAnswerPrayers = action({
   args: { worldId: v.id('worlds'), prayerId: v.optional(v.id('prayers')) },
   handler: async (ctx, args): Promise<{ name: string; accept: boolean; reason: string }[]> => {
+    await yieldToPlayer(ctx, args.worldId);
     const data = await ctx.runQuery(selfInternal.autoAnswerData, args);
     const results = [];
     for (const prayer of data.prayers) {

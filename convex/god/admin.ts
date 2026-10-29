@@ -1,3 +1,4 @@
+import { yieldToPlayer } from '../priority';
 import { v } from 'convex/values';
 import { defineTable } from 'convex/server';
 import {
@@ -83,6 +84,7 @@ const PRAYER_OPS = [
 export const grantPrayer = internalAction({
   args: { worldId: v.id('worlds'), name: v.string(), text: v.string() },
   handler: async (ctx, args) => {
+    await yieldToPlayer(ctx, args.worldId);
     await runAdmin(
       ctx,
       args.worldId,

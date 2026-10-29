@@ -170,7 +170,9 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   opinions have a cooldown and one call per gathering; at most `MAX_AI_CONVERSATIONS`
   townsperson-only conversations and one group chat at a time; each agent prays with
   `PRAYER_CHANCE`. The image server loads its model on demand and frees it after 60 s
-  idle (it shares GPU memory with Ollama). Diagnose slowness by counting
+  idle (it shares GPU memory with Ollama). Player conversations come first: background
+  LLM work calls `yieldToPlayer` (`convex/priority.ts`) and waits while a human is
+  talking to someone. At bedtime nobody leaves a conversation with a human. Diagnose slowness by counting
   `lsof -iTCP:11434 -sTCP:ESTABLISHED` connections and `npx convex logs`.
 - **Lessons** (`lessons` table in `convex/life.ts`): each accident makes that activity
   less likely for everyone (deaths count 3×); kids take more risks.

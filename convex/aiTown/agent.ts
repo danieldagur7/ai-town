@@ -94,12 +94,11 @@ export class Agent {
     }
     const conversation = game.world.playerConversation(player);
     // Nobody walks away from their god at bedtime; they go to bed afterwards.
-    const talkingToGod =
+    // Nobody walks away from the player (or their god) at bedtime; they go to bed afterwards.
+    const talkingToHuman =
       !!conversation &&
-      [...conversation.participants.keys()].some(
-        (id) => game.playerDescriptions.get(id)?.character === GOD_CHARACTER,
-      );
-    if (isSleepTime(game.world) && !talkingToGod) {
+      [...conversation.participants.keys()].some((id) => game.world.players.get(id)?.human);
+    if (isSleepTime(game.world) && !talkingToHuman) {
       this.tickNight(game, now, player);
       return;
     }

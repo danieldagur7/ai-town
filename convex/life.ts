@@ -1,3 +1,4 @@
+import { yieldToPlayer } from './priority';
 import { v } from 'convex/values';
 import { defineTable } from 'convex/server';
 import {
@@ -378,6 +379,7 @@ async function birth(
   parents: Person[],
   given?: { name?: string; description?: string },
 ) {
+  await yieldToPlayer(ctx, worldId);
   const taken = data.names.join(', ');
   const prompt =
     parents.length === 2

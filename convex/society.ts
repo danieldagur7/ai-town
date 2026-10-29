@@ -1,3 +1,4 @@
+import { yieldToPlayer } from './priority';
 import { v } from 'convex/values';
 import { defineTable } from 'convex/server';
 import { internalAction, internalMutation, internalQuery, query } from './_generated/server';
@@ -49,6 +50,7 @@ export const recentEvents = query({
 export const proposeProject = internalAction({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, { worldId }) => {
+    await yieldToPlayer(ctx, worldId);
     const data = await ctx.runQuery(internal.society.proposalContext, { worldId });
     if (!data || data.busy || data.townspeople.length === 0) return;
     const era = eraOf(data.era);

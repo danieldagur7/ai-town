@@ -241,3 +241,7 @@ export const STARVATION_DAYS = 3;
 export const MAX_AI_CONVERSATIONS = 2;
 export const PRAYER_CHANCE = 0.5;
 export const DECREE_OPINION_COOLDOWN = 8 * 60_000;
+
+// Background LLM work waits up to this long while the player is talking to
+// someone, so their replies come first (see convex/priority.ts).
+export const PLAYER_PRIORITY_MAX_WAIT = 45_000;
