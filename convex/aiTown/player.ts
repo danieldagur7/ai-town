@@ -315,7 +315,17 @@ export const playerInputs = {
       if (!player) {
         throw new Error(`Invalid player ID ${playerId}`);
       }
-      if (args.destination) {
+      // The manifested god doesn't walk: it appears wherever it wants to be.
+      const isGod = game.playerDescriptions.get(playerId)?.character === GOD_CHARACTER;
+      if (args.destination && isGod) {
+        const dest = { x: Math.floor(args.destination.x), y: Math.floor(args.destination.y) };
+        if (blocked(game, now, dest, playerId)) {
+          throw new Error("Can't appear there");
+        }
+        stopPlayer(player);
+        player.position = dest;
+        player.speed = 0;
+      } else if (args.destination) {
         movePlayer(game, now, player, args.destination);
       } else {
         stopPlayer(player);
