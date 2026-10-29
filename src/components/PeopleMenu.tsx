@@ -19,6 +19,7 @@ export default function PeopleMenu() {
           name: game.playerDescriptions.get(p.id)?.name ?? p.id,
           emoji: p.activity && p.activity.until > Date.now() ? p.activity.emoji : undefined,
           talking: !!game.world.playerConversation(p),
+          gathering: game.world.gatherings.find((g) => g.participants.includes(p.id))?.kind,
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
@@ -40,6 +41,7 @@ export default function PeopleMenu() {
             >
               <span>{p.name}</span>
               <span>
+                {p.gathering === 'meeting' ? '📣' : p.gathering === 'group' ? '👥' : ''}
                 {p.talking ? '💬' : ''}
                 {p.emoji ?? ''}
               </span>

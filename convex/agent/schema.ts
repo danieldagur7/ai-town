@@ -36,6 +36,11 @@ export const memoryFields = {
     v.object({
       type: v.literal('godSpeech'),
     }),
+    // A group chat or town meeting this player took part in.
+    v.object({
+      type: v.literal('gathering'),
+      gatheringId: v.string(),
+    }),
     // The god punished this player, or the player saw someone punished.
     v.object({
       type: v.literal('punishment'),

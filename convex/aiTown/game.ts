@@ -26,6 +26,7 @@ import { HistoricalObject } from '../engine/historicalObject';
 import { AgentDescription, serializedAgentDescription } from './agentDescription';
 import { parseMap, serializeMap } from '../util/object';
 import { advanceClock } from './clock';
+import { tickGatherings } from './gathering';
 
 const gameState = v.object({
   world: v.object(serializedWorld),
@@ -189,6 +190,7 @@ export class Game extends AbstractGame {
     for (const conversation of this.world.conversations.values()) {
       conversation.tick(this, now);
     }
+    tickGatherings(this, now);
     for (const agent of this.world.agents.values()) {
       agent.tick(this, now);
     }

@@ -9,6 +9,7 @@ import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
 import { isSleepTime, isWindDown } from './clock';
+import { startGathering } from './gathering';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -40,6 +41,8 @@ export const agentInputs = {
       agentId: v.id('agents'),
       destination: v.optional(point),
       invitee: v.optional(v.id('players')),
+      // Start a group chat with these players instead of a 1:1.
+      group: v.optional(v.array(v.id('players'))),
       activity: v.optional(activity),
     },
     handler: (game, now, args) => {
@@ -61,6 +64,15 @@ export const agentInputs = {
         return null;
       }
       const player = game.world.players.get(agent.playerId)!;
+      if (args.group) {
+        const others = args.group
+          .map((id) => game.world.players.get(parseGameId('players', id)))
+          .filter((p): p is Player => !!p);
+        if (startGathering(game, now, 'group', player, others, 'a casual chat')) {
+          agent.lastInviteAttempt = now;
+          return null;
+        }
+      }
       if (args.invitee) {
         const inviteeId = parseGameId('players', args.invitee);
         const invitee = game.world.players.get(inviteeId);

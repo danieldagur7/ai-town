@@ -55,9 +55,9 @@ export const Player = ({
     return null;
   }
 
-  const isSpeaking = !![...game.world.conversations.values()].find(
-    (c) => c.isTyping?.playerId === player.id,
-  );
+  const isSpeaking =
+    !![...game.world.conversations.values()].find((c) => c.isTyping?.playerId === player.id) ||
+    game.world.gatherings.some((g) => g.speaking === player.id);
   const isThinking =
     !isSpeaking &&
     !![...game.world.agents.values()].find(

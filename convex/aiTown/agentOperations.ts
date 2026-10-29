@@ -11,7 +11,15 @@ import {
 } from '../agent/conversation';
 import { assertNever } from '../util/assertNever';
 import { serializedAgent } from './agent';
-import { ACTIVITIES, ACTIVITY_COOLDOWN, CONVERSATION_COOLDOWN } from '../constants';
+import {
+  ACTIVITIES,
+  ACTIVITY_COOLDOWN,
+  CONVERSATION_COOLDOWN,
+  GROUP_CHANCE,
+  GROUP_RADIUS,
+} from '../constants';
+import { distance } from '../util/geometry';
+import { gatheringMessage } from '../agent/gathering';
 import { api, internal } from '../_generated/api';
 import { sleep } from '../util/sleep';
 import { serializedPlayer } from './player';
@@ -147,6 +155,28 @@ export const agentDoSomething = internalAction({
         return;
       }
     }
+    // Sometimes, with a few people around, start a group chat instead.
+    const nearby = args.otherFreePlayers.filter(
+      (p) => distance(p.position, player.position) <= GROUP_RADIUS,
+    );
+    if (
+      !justLeftConversation &&
+      !recentlyAttemptedInvite &&
+      nearby.length >= 2 &&
+      Math.random() < GROUP_CHANCE
+    ) {
+      await sleep(Math.random() * 1000);
+      await ctx.runMutation(api.aiTown.main.sendInput, {
+        worldId: args.worldId,
+        name: 'finishDoSomething',
+        args: {
+          operationId: args.operationId,
+          agentId: args.agent.id,
+          group: nearby.slice(0, 3).map((p) => p.id),
+        },
+      });
+      return;
+    }
     const invitee =
       justLeftConversation || recentlyAttemptedInvite
         ? undefined
@@ -179,3 +209,32 @@ function wanderDestination(worldMap: WorldMap) {
     y: 1 + Math.floor(Math.random() * (worldMap.height - 2)),
   };
 }
+
+// One line in a group chat or town meeting.
+export const agentGatheringMessage = internalAction({
+  args: {
+    worldId: v.id('worlds'),
+    playerId,
+    agentId,
+    gatheringId: v.string(),
+    messageUuid: v.string(),
+    operationId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    let text;
+    try {
+      text = await gatheringMessage(ctx, args.worldId, args.gatheringId, args.playerId);
+    } catch (e: any) {
+      console.error(`Gathering message failed: ${e.message ?? e}`);
+    }
+    await ctx.runMutation(internal.agent.gathering.writeGatheringMessage, {
+      worldId: args.worldId,
+      gatheringId: args.gatheringId,
+      playerId: args.playerId,
+      agentId: args.agentId,
+      operationId: args.operationId,
+      messageUuid: args.messageUuid,
+      text,
+    });
+  },
+});

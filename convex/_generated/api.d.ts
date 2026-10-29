@@ -16,6 +16,7 @@ import type {
 } from "convex/server";
 import type * as agent_conversation from "../agent/conversation.js";
 import type * as agent_embeddingsCache from "../agent/embeddingsCache.js";
+import type * as agent_gathering from "../agent/gathering.js";
 import type * as agent_memory from "../agent/memory.js";
 import type * as aiTown_agent from "../aiTown/agent.js";
 import type * as aiTown_agentDescription from "../aiTown/agentDescription.js";
@@ -26,6 +27,7 @@ import type * as aiTown_clock from "../aiTown/clock.js";
 import type * as aiTown_conversation from "../aiTown/conversation.js";
 import type * as aiTown_conversationMembership from "../aiTown/conversationMembership.js";
 import type * as aiTown_game from "../aiTown/game.js";
+import type * as aiTown_gathering from "../aiTown/gathering.js";
 import type * as aiTown_godMode from "../aiTown/godMode.js";
 import type * as aiTown_ids from "../aiTown/ids.js";
 import type * as aiTown_inputHandler from "../aiTown/inputHandler.js";
@@ -78,6 +80,7 @@ import type * as world from "../world.js";
 declare const fullApi: ApiFromModules<{
   "agent/conversation": typeof agent_conversation;
   "agent/embeddingsCache": typeof agent_embeddingsCache;
+  "agent/gathering": typeof agent_gathering;
   "agent/memory": typeof agent_memory;
   "aiTown/agent": typeof aiTown_agent;
   "aiTown/agentDescription": typeof aiTown_agentDescription;
@@ -88,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   "aiTown/conversation": typeof aiTown_conversation;
   "aiTown/conversationMembership": typeof aiTown_conversationMembership;
   "aiTown/game": typeof aiTown_game;
+  "aiTown/gathering": typeof aiTown_gathering;
   "aiTown/godMode": typeof aiTown_godMode;
   "aiTown/ids": typeof aiTown_ids;
   "aiTown/inputHandler": typeof aiTown_inputHandler;

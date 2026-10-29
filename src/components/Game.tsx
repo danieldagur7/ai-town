@@ -13,6 +13,7 @@ import { GameId } from '../../convex/aiTown/ids.ts';
 import { useServerGame } from '../hooks/serverGame.ts';
 import { DayNightOverlay, LightningFlash } from './DayNightOverlay.tsx';
 import { useGodUi } from '../godUi.tsx';
+import { Gatherings } from './Gatherings.tsx';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
 
@@ -91,6 +92,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
           </div>
           {game.world.clock && <DayNightOverlay clock={game.world.clock} />}
           {game.world.godSmite && <LightningFlash time={game.world.godSmite.time} />}
+          <Gatherings worldId={worldId} game={game} />
         </div>
         {/* Pop-up details panel, shown when an agent is selected */}
         {showDetails && (

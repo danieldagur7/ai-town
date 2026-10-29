@@ -24,6 +24,7 @@ import { movePlayer, stopPlayer } from './movement';
 import { insertInput } from './insertInput';
 import { DAY_LENGTH, clockState, isSleepTime, isWindDown } from './clock';
 import { bedFor } from './beds';
+import { playerGathering, tickGatheringMember } from './gathering';
 import { Player } from './player';
 import { BED_WALK_TIMEOUT } from '../constants';
 import { GOD_CHARACTER } from '../../data/characters';
@@ -86,6 +87,13 @@ export class Agent {
       this.tickNight(game, now, player);
       return;
     }
+    // In a group chat or town meeting: go there and listen; the gathering picks
+    // who speaks. A 1:1 conversation already underway finishes first.
+    const gathering = playerGathering(game, player.id);
+    if (gathering && !conversation) {
+      tickGatheringMember(game, now, gathering, player);
+      return;
+    }
     // Late evening: finish any conversation, then head home before dark.
     if (isWindDown(game.world) && !conversation) {
       if (this.toRemember) {
@@ -127,7 +135,8 @@ export class Agent {
               .filter((p) => p.id !== player.id)
               .filter(
                 (p) =>
-                  ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)),
+                  ![...game.world.conversations.values()].find((c) => c.participants.has(p.id)) &&
+                  !playerGathering(game, p.id),
               )
               .map((p) => p.serialize()),
         agent: this.serialize(),
@@ -417,6 +426,15 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
       break;
     case 'agentDoSomething':
       reference = internal.aiTown.agentOperations.agentDoSomething;
+      break;
+    case 'agentGatheringMessage':
+      reference = internal.aiTown.agentOperations.agentGatheringMessage;
+      break;
+    case 'rememberGathering':
+      reference = internal.agent.gathering.rememberGathering;
+      break;
+    case 'considerTownMeeting':
+      reference = internal.agent.gathering.considerTownMeeting;
       break;
     case 'requestPrayer':
       reference = internal.god.prayers.requestPrayer;

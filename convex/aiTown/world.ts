@@ -5,6 +5,7 @@ import { Agent, serializedAgent } from './agent';
 import { GameId, parseGameId, playerId } from './ids';
 import { parseMap } from '../util/object';
 import { Clock, serializedClock } from './clock';
+import { Gathering, serializedGathering } from './gathering';
 
 export const historicalLocations = v.array(
   v.object({
@@ -20,6 +21,10 @@ export const serializedWorld = {
   agents: v.array(v.object(serializedAgent)),
   historicalLocations: v.optional(historicalLocations),
   clock: v.optional(serializedClock),
+  // Group conversations and town meetings in progress.
+  gatherings: v.optional(v.array(serializedGathering)),
+  lastMeetingDay: v.optional(v.number()),
+  lastMeetingCheckDay: v.optional(v.number()),
   // Where and when the god last struck someone with lightning, for the UI.
   godSmite: v.optional(v.object({ x: v.number(), y: v.number(), time: v.number() })),
   // Where and when the manifested god last spoke to the town, for the UI pulse.
@@ -38,6 +43,9 @@ export class World {
   clock?: Clock;
   godSpeech?: { x: number; y: number; radius: number; time: number };
   godSmite?: { x: number; y: number; time: number };
+  gatherings: Gathering[];
+  lastMeetingDay?: number;
+  lastMeetingCheckDay?: number;
 
   constructor(serialized: SerializedWorld) {
     const { nextId, historicalLocations, clock, godSpeech, godSmite } = serialized;
@@ -46,6 +54,9 @@ export class World {
     this.clock = clock;
     this.godSpeech = godSpeech;
     this.godSmite = godSmite;
+    this.gatherings = serialized.gatherings ?? [];
+    this.lastMeetingDay = serialized.lastMeetingDay;
+    this.lastMeetingCheckDay = serialized.lastMeetingCheckDay;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
     this.players = parseMap(serialized.players, Player, (p) => p.id);
     this.agents = parseMap(serialized.agents, Agent, (a) => a.id);
@@ -77,6 +88,9 @@ export class World {
       clock: this.clock,
       godSpeech: this.godSpeech,
       godSmite: this.godSmite,
+      gatherings: this.gatherings,
+      lastMeetingDay: this.lastMeetingDay,
+      lastMeetingCheckDay: this.lastMeetingCheckDay,
     };
   }
 }

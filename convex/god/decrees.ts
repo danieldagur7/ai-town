@@ -51,6 +51,11 @@ export const issueDecree = mutation({
       status: 'active',
       created: Date.now(),
     });
+    // A new command from the god may be worth a town meeting.
+    await ctx.scheduler.runAfter(0, internal.agent.gathering.considerTownMeeting, {
+      worldId: args.worldId,
+      reason: `The god just issued a new decree: "${text}"`,
+    });
   },
 });
 

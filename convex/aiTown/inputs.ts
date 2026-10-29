@@ -3,6 +3,7 @@ import { playerInputs } from './player';
 import { conversationInputs } from './conversation';
 import { agentInputs } from './agentInputs';
 import { godModeInputs } from './godMode';
+import { gatheringInputs } from './gathering';
 
 // It's easy to hit circular dependencies with these imports,
 // so assert at module scope so we hit errors when analyzing.
@@ -10,7 +11,8 @@ if (
   playerInputs === undefined ||
   conversationInputs === undefined ||
   agentInputs === undefined ||
-  godModeInputs === undefined
+  godModeInputs === undefined ||
+  gatheringInputs === undefined
 ) {
   throw new Error("Input map is undefined, check if there's a circular import.");
 }
@@ -22,6 +24,8 @@ export const inputs = {
   ...agentInputs,
   // God mode controls.
   ...godModeInputs,
+  // Group conversations and town meetings.
+  ...gatheringInputs,
 };
 export type Inputs = typeof inputs;
 export type InputNames = keyof Inputs;

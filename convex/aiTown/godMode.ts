@@ -118,6 +118,11 @@ export const godModeInputs = {
         punishment,
         witnesses,
       });
+      // Something like this may be worth a town meeting.
+      game.scheduleOperation('considerTownMeeting', {
+        worldId: game.worldId,
+        reason: `The god just punished ${game.playerDescriptions.get(target.id)!.name}: ${punishment}`,
+      });
       return witnesses.length;
     },
   }),

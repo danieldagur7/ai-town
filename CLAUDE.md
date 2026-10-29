@@ -92,6 +92,13 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
     `summarizeDecreeTalk` keyword-filters the speaker's lines and asks the LLM what
     they said about each decree, saving it to `decreeOpinions` for the God menu.
     There is no LLM planning step yet; Stage 5d adds one and should reuse the same helper.
+- **Gatherings** (`convex/aiTown/gathering.ts` engine side, `convex/agent/gathering.ts`
+  LLM side): group chats (started from `agentDoSomething` when 2+ free characters are
+  near, `GROUP_CHANCE`) and town meetings on the plaza (called by an agent via
+  `considerTownMeeting`: daily at the start of day, and after decrees/punishments; at
+  most one per game day). Stored in `world.gatherings`; messages use the gathering id as
+  `conversationId`. `tickGatherings` picks speakers one at a time; ended gatherings
+  give everyone one shared `gathering` memory. UI: `src/components/Gatherings.tsx`.
 - **Agents** (`convex/aiTown/agent.ts`): `Agent.tick` is rule-based (wander/activity,
   invite, accept/reject, walk over, talk, leave, remember). Anything slow is an
   operation (`startOperation` → `convex/aiTown/agentOperations.ts` internalAction),

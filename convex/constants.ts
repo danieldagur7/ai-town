@@ -133,3 +133,15 @@ export const PUNISH_FAITH = -5;
 export const PUNISH_IMPORTANCE = 9;
 export const PUNISH_WITNESS_IMPORTANCE = 8;
 export const PUNISHMENT_PROMPT_DAYS = 2;
+
+// Group conversations and town meetings.
+// Talking starts once everyone arrives, or after this long with at least two there.
+export const GATHER_ARRIVE_TIMEOUT = 90_000;
+// Pause between lines so it reads like a conversation.
+export const GATHER_MESSAGE_GAP = 1500;
+export const MEETING_MAX_MESSAGES = 12;
+export const GROUP_MAX_MESSAGES = 6;
+// An agent looking for company starts a group chat instead of a 1:1 with this
+// chance, when at least two other free characters are within GROUP_RADIUS tiles.
+export const GROUP_RADIUS = 6;
+export const GROUP_CHANCE = 0.35;

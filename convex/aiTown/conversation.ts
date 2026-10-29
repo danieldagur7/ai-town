@@ -130,6 +130,11 @@ export class Conversation {
       console.log(reason);
       return { error: reason };
     }
+    if (game.world.gatherings.some((g) => g.participants.includes(invitee.id))) {
+      const reason = `Player ${invitee.id} is in a group conversation`;
+      console.log(reason);
+      return { error: reason };
+    }
     if ([...game.world.conversations.values()].find((c) => c.participants.has(invitee.id))) {
       const reason = `Player ${player.id} is already in a conversation`;
       console.log(reason);
@@ -270,6 +275,9 @@ export const conversationInputs = {
       console.log(`Starting ${playerId} ${inviteeId}...`);
       // The manifested god can interrupt: both leave whatever they were in.
       if (game.playerDescriptions.get(playerId)?.character === GOD_CHARACTER) {
+        for (const g of game.world.gatherings) {
+          g.participants = g.participants.filter((id) => id !== inviteeId);
+        }
         game.world.playerConversation(player)?.leave(game, now, player);
         const interrupted = game.world.playerConversation(invitee);
         if (interrupted) {
