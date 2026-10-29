@@ -1,6 +1,7 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useServerGame } from '../hooks/serverGame';
+import { townLooks } from '../../convex/aiTown/townView';
 
 // The town's stockpile, next to the clock.
 export default function ResourceBar() {
@@ -11,6 +12,7 @@ export default function ResourceBar() {
   }
   const { wood, stone, food } = game.world.resources;
   const project = game.world.project;
+  const looks = townLooks(game.world.structures);
   return (
     <div
       className="pointer-events-auto bg-brown-800 border-4 border-brown-900 text-brown-100 shadow-solid text-xl px-3 py-1 flex gap-4"
@@ -19,6 +21,7 @@ export default function ResourceBar() {
       <span>🪵 {Math.floor(wood)}</span>
       <span>🪨 {Math.floor(stone)}</span>
       <span>🌾 {Math.floor(food)}</span>
+      <span title={`How lovely the town looks: ${looks.notes.join('; ')}`}>✨ {looks.beauty}</span>
       {project && (
         <span title={project.name}>
           {project.kind === 'statue' ? '🗿' : '🏗️'}{' '}

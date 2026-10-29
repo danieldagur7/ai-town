@@ -20,6 +20,7 @@ import {
   WORK_SHIFT,
 } from '../constants';
 import { ERAS, eraOf, houseArtKey, structureArtKey } from './eras';
+import { Direction, directionOf, townLooksLine } from './townView';
 
 export const BUILDING = 'building';
 
@@ -92,6 +93,7 @@ export function townPrompt(world: {
   else if (world.resources && world.resources.food < 5) text += ' Food is running low.';
   const built = (world.structures ?? []).slice(-6).map((s) => s.name);
   if (built.length > 0) text += ` The town has built ${built.join(', ')}.`;
+  text += townLooksLine(world.structures ?? []);
   const project = world.project;
   if (project) {
     const pct = Math.floor((100 * project.work) / project.workNeeded);
@@ -104,7 +106,13 @@ export function townPrompt(world: {
 // assumed to have collected the materials: the stockpile is topped up.
 export function startProject(
   game: Game,
-  args: { kind: 'statue' | 'building'; name: string; subject?: string; proposer?: string },
+  args: {
+    kind: 'statue' | 'building';
+    name: string;
+    subject?: string;
+    proposer?: string;
+    direction?: Direction;
+  },
 ) {
   const world = game.world;
   if (world.project) {
@@ -112,7 +120,7 @@ export function startProject(
   }
   const statue = args.kind === 'statue';
   const cost = statue ? { ...STATUE_COST } : { ...BUILDING_COST };
-  const site = statue ? undefined : findSite(game);
+  const site = statue ? undefined : findSite(game, args.direction);
   if (!statue && !site) {
     throw new Error('There is no free space left to build on');
   }
@@ -215,7 +223,7 @@ export function setEra(game: Game, era: number) {
 
 // A free 3x3 spot (with a one-tile margin) for a new building, as close to the
 // plaza as possible: no map objects, houses, fields, beds or other buildings.
-function findSite(game: Game) {
+function findSite(game: Game, direction?: Direction) {
   const map = game.worldMap;
   const taken: { x: number; y: number; w: number; h: number }[] = [
     { ...PLAZA },
@@ -239,15 +247,34 @@ function findSite(game: Game) {
     }
     return true;
   };
+  // Close to the plaza is best, but with breathing room between buildings, on
+  // the side the proposer asked for, and otherwise on a side with little built
+  // (so the town grows evenly instead of piling up in one corner).
   const center = { x: PLAZA.x + PLAZA.w / 2, y: PLAZA.y + PLAZA.h / 2 };
+  const built = game.world.structures.map((s) => structureSpot(s));
+  const perSide = new Map<Direction, number>();
+  for (const b of built) perSide.set(directionOf(b), (perSide.get(directionOf(b)) ?? 0) + 1);
+  const score = (x: number, y: number) => {
+    const spot = { x: x + 1, y: y + 2 };
+    const side = directionOf(spot);
+    let s = distance({ x: x + 1.5, y: y + 1.5 }, center);
+    for (const b of built) {
+      const d = distance(spot, b);
+      if (d < 6) s += (6 - d) * 3;
+    }
+    if (direction) s += side === direction ? 0 : 25;
+    else s += (perSide.get(side) ?? 0) * 4;
+    return s;
+  };
   let best: { x: number; y: number } | undefined;
-  let bestDist = Infinity;
+  let bestScore = Infinity;
   for (let x = 1; x < map.width - 4; x++) {
     for (let y = 1; y < map.height - 4; y++) {
-      const d = distance({ x: x + 1.5, y: y + 1.5 }, center);
-      if (d < bestDist && !overlaps(x, y) && free(x, y)) {
+      if (distance({ x: x + 1.5, y: y + 1.5 }, center) > 30) continue;
+      const s = score(x, y);
+      if (s < bestScore && !overlaps(x, y) && free(x, y)) {
         best = { x, y };
-        bestDist = d;
+        bestScore = s;
       }
     }
   }

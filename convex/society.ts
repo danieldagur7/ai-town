@@ -1,3 +1,4 @@
+import { DIRECTIONS, birdsEyeView } from './aiTown/townView';
 import { yieldToPlayer } from './priority';
 import { v } from 'convex/values';
 import { defineTable } from 'convex/server';
@@ -62,27 +63,28 @@ export const proposeProject = internalAction({
             role: 'user',
             content: [
               `A small town is in its ${era.name} era: ${era.blurb}.`,
-              data.built.length > 0
-                ? `Already built: ${data.built.join(', ')}.`
-                : 'Nothing has been built yet.',
+              birdsEyeView(data),
               data.decrees.length > 0
                 ? `Their god has decreed: ${data.decrees.map((d) => `"${d}"`).join('; ')}.`
                 : '',
               'Townspeople:',
               ...data.townspeople.map((p) => `- ${p.name}: ${p.identity}`),
-              `Which townsperson proposes building something new, and what? It must fit the ` +
-                `${era.name} era (ideas: ${era.ideas})` +
+              `The townspeople care how their town looks as a whole: they picture it from above ` +
+                `and want it balanced, charming and growing. Which townsperson proposes building ` +
+                `something new, what, and where? It must fit the ${era.name} era (ideas: ${era.ideas})` +
                 (next
                   ? `, ideally something that helps the town progress toward the ${next.name} era`
                   : '') +
-                ", and not repeat what's built. Obey the god's decrees if they ask for a building.",
-              'Reply with exactly one line: <Name> | <building name, 2-5 words> | <what the outside of the building looks like, under 15 words>',
+                ", and not repeat what's built. If the town looks plain, something beautiful " +
+                '(a garden, fountain, monument...) is welcome; if it lacks something useful, build that. ' +
+                "Choose the side of the plaza where it would look best. Obey the god's decrees if they ask for a building.",
+              `Reply with exactly one line: <Name> | <building name, 2-5 words> | <what the outside of the building looks like, under 15 words> | <side: one of ${DIRECTIONS.join(', ')}> | <why it makes the town nicer, under 15 words>`,
             ]
               .filter(Boolean)
               .join('\n'),
           },
         ],
-        max_tokens: 60,
+        max_tokens: 100,
       });
       const parts = content
         .trim()
@@ -94,11 +96,21 @@ export const proposeProject = internalAction({
         return;
       }
       const proposer = data.townspeople.find((p) => p.name === parts[0])?.name;
+      const side = parts[3]?.toLowerCase().replace(/\s+/g, '-');
+      const direction = DIRECTIONS.find((d) => side?.startsWith(d) && side.length - d.length < 3);
+      const name = parts[1].replace(/^(a|an|the)\s+/i, 'a ');
       await ctx.runMutation(api.aiTown.main.sendInput, {
         worldId,
         name: 'startProject',
-        args: { name: parts[1].replace(/^(a|an|the)\s+/i, 'a '), subject: parts[2], proposer },
+        args: { name, subject: parts[2], proposer, direction },
       });
+      if (proposer && parts[4]) {
+        await ctx.runMutation(internal.society.townEvent, {
+          worldId,
+          emoji: '🗺️',
+          text: `${proposer} wants ${name} on the ${direction ?? 'best'} side: "${parts[4]}"`,
+        });
+      }
     } finally {
       await release();
     }
@@ -127,9 +139,22 @@ export const proposalContext = internalQuery({
     return {
       busy: !!world.project,
       era: world.era ?? 0,
-      built: (world.structures ?? []).map((s) => s.name),
+      structures: world.structures ?? [],
       decrees: (await activeDecrees(ctx.db, worldId)).map((d) => d.text),
       townspeople,
     };
+  },
+});
+
+// Debug: the bird's-eye view the townspeople get (`just convex run society:townView`).
+export const townView = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const status = await ctx.db
+      .query('worldStatus')
+      .filter((q) => q.eq(q.field('isDefault'), true))
+      .first();
+    const world = status && (await ctx.db.get(status.worldId));
+    return world ? birdsEyeView(world) : null;
   },
 });

@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { DIRECTIONS } from './townView';
 import { inputHandler } from './inputHandler';
 import { clockState, isSleepTime } from './clock';
 import { distance } from '../util/geometry';
@@ -53,7 +54,13 @@ export const godModeInputs = {
   }),
   // Build anything: the god's command, or a townsperson's proposal.
   startProject: inputHandler({
-    args: { name: v.string(), subject: v.optional(v.string()), proposer: v.optional(v.string()) },
+    args: {
+      name: v.string(),
+      subject: v.optional(v.string()),
+      proposer: v.optional(v.string()),
+      // Which side of the plaza to build on (see townView.ts DIRECTIONS).
+      direction: v.optional(v.string()),
+    },
     handler: (game, _now, args) => {
       const name = args.name.trim();
       if (!name) throw new Error('Say what to build');
@@ -62,6 +69,7 @@ export const godModeInputs = {
         name,
         subject: args.subject?.trim() || name,
         proposer: args.proposer,
+        direction: DIRECTIONS.find((d) => d === args.direction),
       });
     },
   }),

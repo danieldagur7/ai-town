@@ -8,6 +8,7 @@ import { distance } from '../util/geometry';
 import { clockState, isSleepTime } from './clock';
 import { PLAZA } from '../../data/town';
 import { morningMeal } from './economy';
+import { townLooks } from './townView';
 import {
   GATHER_ARRIVE_TIMEOUT,
   GATHER_MESSAGE_GAP,
@@ -108,6 +109,10 @@ export function tickGatherings(game: Game, now: number) {
     game.world.lastMorningDay = clock.day;
     morningMeal(game);
     game.scheduleOperation('lifeCycle', { worldId: game.worldId });
+    // Waking up to a lovely town lifts everyone a little; a dreary one wears on them.
+    const beauty = townLooks(game.world.structures).beauty;
+    const delta = beauty >= 75 ? 2 : beauty >= 50 ? 1 : beauty < 30 ? -1 : 0;
+    if (delta) game.scheduleOperation('everyoneWellbeing', { worldId: game.worldId, delta });
     if (!game.world.project) {
       game.scheduleOperation('proposeProject', { worldId: game.worldId });
     }

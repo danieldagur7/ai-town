@@ -44,6 +44,7 @@ import type * as aiTown_movement from "../aiTown/movement.js";
 import type * as aiTown_player from "../aiTown/player.js";
 import type * as aiTown_playerDescription from "../aiTown/playerDescription.js";
 import type * as aiTown_project from "../aiTown/project.js";
+import type * as aiTown_townView from "../aiTown/townView.js";
 import type * as aiTown_world from "../aiTown/world.js";
 import type * as aiTown_worldMap from "../aiTown/worldMap.js";
 import type * as art from "../art.js";
@@ -121,6 +122,7 @@ declare const fullApi: ApiFromModules<{
   "aiTown/player": typeof aiTown_player;
   "aiTown/playerDescription": typeof aiTown_playerDescription;
   "aiTown/project": typeof aiTown_project;
+  "aiTown/townView": typeof aiTown_townView;
   "aiTown/world": typeof aiTown_world;
   "aiTown/worldMap": typeof aiTown_worldMap;
   art: typeof art;

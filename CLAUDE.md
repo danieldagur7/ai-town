@@ -156,6 +156,13 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   `ERA_PROJECTS` buildings → next era (Village → Space Age), and homes are redrawn in
   the era style (`EraHouses`). Each morning `morningMeal` feeds everyone; hunger hurts
   wellbeing and `STARVATION_DAYS` in a row kills the frailest. News feed: `townEvents`.
+- **Bird's-eye view** (`convex/aiTown/townView.ts`, plain code): where everything sits
+  around the plaza, bare and crowded sides, and a beauty score (lovely vs useful
+  buildings, balance across sides, breathing room). Proposals get the full view and
+  choose a side (`startProject` `direction`; `findSite` favours it, keeps spacing and
+  otherwise fills the emptiest side); conversations get one line on how the town
+  looks; the morning nudges wellbeing by beauty; the toolbar shows ✨. Debug:
+  `just convex run society:townView`.
 - **Art** (`convex/art.ts`, `scripts/imagegen_server.py`): the engine names art by key
   (`structure:<id>`, `house:<era>:<style>`); `requestArt` calls the local server and
   stores PNGs in Convex storage; `artByKey` feeds the map. Redraw from God menu → Build.
