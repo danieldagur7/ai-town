@@ -18,7 +18,6 @@ import TownNews from './components/TownNews.tsx';
 import GodMenu from './components/GodMenu.tsx';
 import PeopleMenu from './components/PeopleMenu.tsx';
 import { GodUiProvider } from './godUi.tsx';
-import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
 
 export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false);
@@ -35,32 +34,27 @@ export default function Home() {
           <div className="font-body">
             <h1 className="text-center text-6xl font-bold font-display game-title">Help</h1>
             <p>
-              Welcome to AI town. AI town supports both anonymous <i>spectators</i> and logged in{' '}
-              <i>interactivity</i>.
+              Welcome to AI town: a little society that grows, loves, fights, builds and dies on
+              its own, with you as its god, as one of its people, or both.
             </p>
-            <h2 className="text-4xl mt-4">Spectating</h2>
+            <h2 className="text-4xl mt-4">Watching</h2>
             <p>
-              Click and drag to move around the town, and scroll in and out to zoom. You can click
-              on an individual character to view its chat history.
+              Drag to move around and scroll to zoom. Click anyone to see what they're saying, how
+              old they are, how they're doing and how they feel about everyone. People finds anyone
+              on the map; the era button shows the town news.
             </p>
-            <h2 className="text-4xl mt-4">Interactivity</h2>
+            <h2 className="text-4xl mt-4">Playing as yourself</h2>
             <p>
-              If you log in, you can join the simulation and directly talk to different agents!
-              After logging in, click the "Interact" button, and your character will appear
-              somewhere on the map with a highlighted circle underneath you.
+              "Play as me" lets you create your own character. Click the map to walk, click someone
+              and "Start conversation" to talk, and join meetings from their card. Work, pray, make
+              friends and enemies, fall in love and start a family. When your character dies they're
+              gone for good: start someone new, or carry on as one of your children.
             </p>
-            <p className="text-2xl mt-2">Controls:</p>
-            <p className="mt-4">Click to navigate around.</p>
-            <p className="mt-4">
-              To talk to an agent, click on them and then click "Start conversation," which will ask
-              them to start walking towards you. Once they're nearby, the conversation will start,
-              and you can speak to each other. You can leave at any time by closing the conversation
-              pane or moving away. They may propose a conversation to you - you'll see a button to
-              accept in the messages panel.
-            </p>
-            <p className="mt-4">
-              AI town only supports {MAX_HUMAN_PLAYERS} humans at a time. If you're idle for five
-              minutes, you'll be automatically removed from the simulation.
+            <h2 className="text-4xl mt-4">God mode</h2>
+            <p>
+              Answer prayers (or let auto-answer decide by your decrees), issue decrees, punish,
+              manifest as The Light, command buildings, and type anything into "Command the world"
+              to change the world directly.
             </p>
           </div>
         </ReactModal>

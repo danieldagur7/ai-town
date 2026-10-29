@@ -154,7 +154,7 @@ export const GROUP_MAX_MESSAGES = 6;
 // An agent looking for company starts a group chat instead of a 1:1 with this
 // chance, when at least two other free characters are within GROUP_RADIUS tiles.
 export const GROUP_RADIUS = 6;
-export const GROUP_CHANCE = 0.35;
+export const GROUP_CHANCE = 0.2;
 
 // Town resources: what the town starts with.
 export const START_RESOURCES = { wood: 0, stone: 0, food: 20 };
