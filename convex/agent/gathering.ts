@@ -220,18 +220,17 @@ export const rememberGathering = internalAction({
         embedding,
       });
     }
-    // Let the God menu see what people said about the decrees.
+    // Let the God menu see what people said about the decrees (one call for everyone).
+    const people = [];
     for (const p of args.participants) {
       const name = messages.find((m) => m.author === p.playerId)?.authorName;
-      if (!name) continue;
-      await ctx.scheduler.runAfter(0, internal.god.decrees.summarizeDecreeTalk, {
-        worldId: args.worldId,
-        playerId: p.playerId,
-        name,
-        otherName: names.filter((n) => n !== name).join(', '),
-        transcript: messages.map((m) => ({ author: m.authorName, text: m.text })),
-      });
+      if (name) people.push({ playerId: p.playerId, name });
     }
+    await ctx.scheduler.runAfter(0, internal.god.decrees.summarizeGroupDecreeTalk, {
+      worldId: args.worldId,
+      people,
+      transcript: messages.map((m) => ({ author: m.authorName, text: m.text })),
+    });
   },
 });
 

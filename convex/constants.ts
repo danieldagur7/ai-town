@@ -18,8 +18,8 @@ export const COLLISION_THRESHOLD = 0.75;
 // How many human players can be in a world at once.
 export const MAX_HUMAN_PLAYERS = 8;
 
-// Don't talk to anyone for 15s after having a conversation.
-export const CONVERSATION_COOLDOWN = 15000;
+// Don't talk to anyone for 45s after having a conversation (keeps the LLM queue short).
+export const CONVERSATION_COOLDOWN = 45_000;
 
 // Don't do another activity for 10s after doing one.
 export const ACTIVITY_COOLDOWN = 10_000;
@@ -113,8 +113,8 @@ export const FAITH_IGNORED = -10;
 // A prayer stuck generating this long (e.g. its action crashed) is given up on.
 export const PRAYER_GENERATION_TIMEOUT = 5 * 60_000;
 // How many recent memories a prayer draws on, and how much of each.
-export const PRAYER_RECENT_MEMORIES = 5;
-export const PRAYER_MEMORY_CHARS = 300;
+export const PRAYER_RECENT_MEMORIES = 2;
+export const PRAYER_MEMORY_CHARS = 160;
 // Importance of the memory a character gets when its prayer is answered or not.
 export const PRAYER_ANSWERED_IMPORTANCE = 8;
 export const PRAYER_DECLINED_IMPORTANCE = 6;
@@ -233,3 +233,11 @@ export const FIELD_YIELD = 1;
 export const FARM_YIELD = 3;
 export const GATHER_YIELD = 4;
 export const STARVATION_DAYS = 3;
+
+// Performance: at most MAX_AI_CONVERSATIONS conversations between townspeople at
+// once (ones with the player don't count), each agent prays on a given night
+// with PRAYER_CHANCE, and a person's opinion of a decree is re-summarized at
+// most once per DECREE_OPINION_COOLDOWN.
+export const MAX_AI_CONVERSATIONS = 2;
+export const PRAYER_CHANCE = 0.5;
+export const DECREE_OPINION_COOLDOWN = 8 * 60_000;

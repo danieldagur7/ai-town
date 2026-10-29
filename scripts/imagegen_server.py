@@ -7,10 +7,12 @@ Run (from the repo root):
 POST /generate  {"subject": "...", "size": 96, "seed": 1}  ->  image/png
 GET  /health    ->  "ok"
 """
+import gc
 import io
 import json
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import torch
@@ -18,13 +20,40 @@ from diffusers import AutoPipelineForText2Image
 from PIL import Image
 
 PORT = 7861
+# The model takes ~7 GB of (shared) GPU memory, which the chat model needs too,
+# so it's loaded on demand and freed after IDLE_SECONDS without requests.
+IDLE_SECONDS = 60
 device = "mps" if torch.backends.mps.is_available() else "cpu"
-print(f"Loading models on {device}...", file=sys.stderr)
-pipe = AutoPipelineForText2Image.from_pretrained(
-    "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
-).to(device)
-pipe.load_lora_weights("nerijs/pixel-art-xl", weight_name="pixel-art-xl.safetensors")
 lock = threading.Lock()
+pipe = None
+last_used = 0.0
+
+
+def get_pipe():
+    global pipe
+    if pipe is None:
+        print(f"Loading models on {device}...", file=sys.stderr)
+        pipe = AutoPipelineForText2Image.from_pretrained(
+            "stabilityai/sdxl-turbo", torch_dtype=torch.float16, variant="fp16"
+        ).to(device)
+        pipe.load_lora_weights("nerijs/pixel-art-xl", weight_name="pixel-art-xl.safetensors")
+    return pipe
+
+
+def unload_when_idle():
+    global pipe
+    while True:
+        time.sleep(10)
+        with lock:
+            if pipe is not None and time.time() - last_used > IDLE_SECONDS:
+                print("Idle: unloading models", file=sys.stderr)
+                pipe = None
+                gc.collect()
+                if device == "mps":
+                    torch.mps.empty_cache()
+
+
+threading.Thread(target=unload_when_idle, daemon=True).start()
 
 
 def generate(subject: str, size: int, seed: int) -> bytes:
@@ -32,8 +61,10 @@ def generate(subject: str, size: int, seed: int) -> bytes:
         f"pixel art, {subject}, single object, centered, rpg game sprite, "
         "16-bit, plain solid white background, no ground, no shadow"
     )
+    global last_used
     with lock:
-        image = pipe(
+        last_used = time.time()
+        image = get_pipe()(
             prompt=prompt,
             num_inference_steps=4,
             guidance_scale=0.0,
@@ -41,6 +72,7 @@ def generate(subject: str, size: int, seed: int) -> bytes:
             height=512,
             generator=torch.Generator("cpu").manual_seed(seed),
         ).images[0]
+        last_used = time.time()
     # Box-filter down (cleans the noisy pseudo-pixels), then flood-fill the
     # background away from the edges so light parts inside the object survive.
     small = image.resize((size, size), Image.BOX).convert("RGBA")

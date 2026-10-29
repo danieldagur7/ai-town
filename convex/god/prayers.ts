@@ -16,6 +16,8 @@ import { chatCompletion, fetchEmbedding } from '../util/llm';
 import { adjustFaith, faithDescription } from './faith';
 import { activeDecrees } from './decrees';
 import { punishmentPrompt } from './punishment';
+import { adjustWellbeing } from '../life';
+import { insertInput } from '../aiTown/insertInput';
 import {
   FAITH_ANSWERED,
   FAITH_IGNORED,
@@ -104,9 +106,19 @@ export const claimNext = internalMutation({
 });
 
 export const finishPrayer = internalMutation({
-  args: { prayerId: v.id('prayers'), text: v.optional(v.string()) },
-  handler: async (ctx, { prayerId, text }) => {
-    await ctx.db.patch(prayerId, text ? { status: 'pending', text } : { status: 'skipped' });
+  args: {
+    prayerId: v.id('prayers'),
+    text: v.optional(v.string()),
+    summary: v.optional(v.string()),
+    // Already decided in the same call (auto-answer on).
+    decided: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { prayerId, text, summary, decided }) => {
+    await ctx.db.patch(
+      prayerId,
+      text ? { status: 'pending', text, summary } : { status: 'skipped' },
+    );
+    if (decided) return;
     const prayer = await ctx.db.get(prayerId);
     const settings =
       text &&
@@ -132,18 +144,30 @@ export const processQueue = internalAction({
       if (!prayer) {
         return;
       }
-      let text;
+      let result;
       try {
-        text = await generatePrayer(ctx, prayer);
+        result = await generatePrayer(ctx, prayer);
       } catch (e: any) {
         console.error(`Prayer for ${prayer.name} failed: ${e.message ?? e}`);
       }
-      console.log(`${prayer.name} prayed on night ${prayer.night}: ${text}`);
-      await ctx.runMutation(selfInternal.finishPrayer, { prayerId: prayer._id, text });
+      await ctx.runMutation(selfInternal.finishPrayer, {
+        prayerId: prayer._id,
+        text: result?.text,
+        summary: result?.summary,
+        decided: !!result?.decision,
+      });
+      if (result?.decision) {
+        await ctx.runMutation(selfInternal.applyAutoAnswer, {
+          prayerId: prayer._id,
+          ...result.decision,
+        });
+      }
     }
   },
 });
 
+// One short call per prayer: the prayer itself (a single sentence), a one-line
+// summary for the inbox, and, when auto-answer is on, the god's decision too.
 async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
   const data = await ctx.runQuery(selfInternal.prayerPromptData, {
     worldId: prayer.worldId,
@@ -151,41 +175,51 @@ async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
     agentId: prayer.agentId!,
   });
   const prompt = [
-    `You are ${prayer.name}. ${data.identity}`,
-    `What you want lately: ${data.plan}`,
-    `It's night ${prayer.night}. You're lying in bed in the dark, and before you fall asleep ` +
-      `you say a short private prayer to the unseen god who watches over the town.`,
+    `${prayer.name}: ${data.identity.split('.').slice(0, 2).join('.')}.`,
     faithDescription(data.faith ?? FAITH_START),
   ];
-  if (data.lastAnswer) {
-    prompt.push(data.lastAnswer);
-  }
-  if (data.decrees.length > 0) {
-    prompt.push('The god has decreed:', ...data.decrees.map((d) => ` - "${d}"`));
-  }
+  if (data.memories.length > 0) prompt.push(`On their mind: ${data.memories.join(' | ')}`);
   prompt.push(...data.punishments);
-  if (data.memories.length > 0) {
-    prompt.push('Things on your mind from recently:');
-    prompt.push(...data.memories.map((m) => ` - ${m}`));
+  if (data.auto && data.decrees.length > 0) {
+    prompt.push(`The god's decrees (its will): ${data.decrees.map((d) => `"${d}"`).join('; ')}`);
   }
   prompt.push(
-    'Write the prayer in your own voice, 2 to 4 sentences, first person. Talk to the god ' +
-      'plainly, like a real person would: mention one or two specific things from your day, ' +
-      'someone you care or worry about, and what you hope for or fear. No title, no quotes, ' +
-      'no stage directions.',
+    `At bedtime ${prayer.name} says a short prayer to the god about one thing they want. ` +
+      'Reply with JSON only: {"prayer": "<first person, one sentence, under 20 words>", ' +
+      `"summary": "<${prayer.name} wants X because Y, under 12 words>"` +
+      (data.auto
+        ? ', "decision": "ACCEPT or DECLINE (accept if it supports a decree or is kind and good ' +
+          'for the town; decline if it goes against a decree or is selfish or harmful)", ' +
+          '"reason": "<under 10 words>", "message": "<the god\'s reply, one short sentence>", ' +
+          '"effect": "<if accepted: wellbeing +N (up to 20), food +N, wood +N or stone +N ' +
+          '(up to 10); else none>"'
+        : '') +
+      '}',
   );
   const { content } = await chatCompletion({
     messages: [{ role: 'user', content: prompt.join('\n') }],
-    max_tokens: 200,
-  });
-  const text = content
-    .trim()
+    max_tokens: data.auto ? 130 : 70,
+    response_format: { type: 'json_object' },
+  } as any);
+  const parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+  const text = String(parsed.prayer ?? '')
     .replace(/^["“]|["”]$/g, '')
     .trim();
-  if (!text) {
-    throw new Error('Empty prayer');
-  }
-  return text;
+  if (!text) throw new Error('Empty prayer');
+  const decision = String(parsed.decision ?? '').toUpperCase();
+  return {
+    text,
+    summary: parsed.summary ? String(parsed.summary).trim() : undefined,
+    decision:
+      data.auto && (decision.includes('ACCEPT') || decision.includes('DECLINE'))
+        ? {
+            accept: decision.includes('ACCEPT'),
+            reason: String(parsed.reason ?? ''),
+            message: String(parsed.message ?? ''),
+            effect: String(parsed.effect ?? 'none'),
+          }
+        : undefined,
+  };
 }
 
 export const prayerPromptData = internalQuery({
@@ -212,6 +246,10 @@ export const prayerPromptData = internalQuery({
       .first();
     const decrees = await activeDecrees(ctx.db, args.worldId);
     const punishments = await punishmentPrompt(ctx.db, args.worldId, args.playerId);
+    const settings = await ctx.db
+      .query('godSettings')
+      .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
+      .first();
     let lastAnswer;
     if (answered) {
       lastAnswer =
@@ -226,6 +264,7 @@ export const prayerPromptData = internalQuery({
       lastAnswer,
       decrees: decrees.map((d) => d.text),
       punishments,
+      auto: settings?.autoAnswerPrayers ?? false,
       memories: memories.map((m) => m.description.slice(0, PRAYER_MEMORY_CHARS)),
     };
   },
@@ -282,8 +321,14 @@ export const autoAnswerPrayers = action({
     const data = await ctx.runQuery(selfInternal.autoAnswerData, args);
     const results = [];
     for (const prayer of data.prayers) {
+      // Several runs can overlap (new prayers, "Decide all"); judge each prayer once.
+      const mine = await ctx.runMutation(selfInternal.claimForDecision, { prayerId: prayer._id });
+      if (!mine) continue;
       const decision = await judgePrayer(prayer, data.decrees);
-      if (!decision) continue;
+      if (!decision) {
+        await ctx.runMutation(selfInternal.releaseDecision, { prayerId: prayer._id });
+        continue;
+      }
       const applied = await ctx.runMutation(selfInternal.applyAutoAnswer, {
         prayerId: prayer._id,
         ...decision,
@@ -311,10 +356,13 @@ async function judgePrayer(prayer: Doc<'prayers'>, decrees: string[]) {
     'DECISION: ACCEPT or DECLINE',
     'REASON: <under 15 words, mention the decree if one decided it>',
     'MESSAGE: <one short sentence the god says to them, warm if accepted, firm if declined>',
+    'EFFECT: <if accepted, the one change that best grants it: "wellbeing +N" (N up to 20, ' +
+      'for comfort, healing, hope), "food +N", "wood +N" or "stone +N" (N up to 10); ' +
+      'otherwise "none">',
   ];
   const { content } = await chatCompletion({
     messages: [{ role: 'user', content: prompt.join('\n') }],
-    max_tokens: 90,
+    max_tokens: 110,
   });
   const decision = content.match(/DECISION:\s*\**\s*(ACCEPT|DECLINE)/i);
   if (!decision) {
@@ -330,8 +378,28 @@ async function judgePrayer(prayer: Doc<'prayers'>, decrees: string[]) {
     accept: decision[1].toUpperCase() === 'ACCEPT',
     reason: line('REASON'),
     message: line('MESSAGE'),
+    effect: line('EFFECT'),
   };
 }
+
+export const claimForDecision = internalMutation({
+  args: { prayerId: v.id('prayers') },
+  handler: async (ctx, { prayerId }) => {
+    const prayer = await ctx.db.get(prayerId);
+    const now = Date.now();
+    if (!prayer || prayer.status !== 'pending') return false;
+    if (prayer.deciding && prayer.deciding > now - 3 * 60_000) return false;
+    await ctx.db.patch(prayerId, { deciding: now });
+    return true;
+  },
+});
+
+export const releaseDecision = internalMutation({
+  args: { prayerId: v.id('prayers') },
+  handler: async (ctx, { prayerId }) => {
+    await ctx.db.patch(prayerId, { deciding: undefined });
+  },
+});
 
 export const autoAnswerData = internalQuery({
   args: { worldId: v.id('worlds'), prayerId: v.optional(v.id('prayers')) },
@@ -354,12 +422,24 @@ export const applyAutoAnswer = internalMutation({
     accept: v.boolean(),
     reason: v.string(),
     message: v.string(),
+    effect: v.string(),
   },
   handler: async (ctx, args) => {
     const prayer = await ctx.db.get(args.prayerId);
     // The god may have answered it by hand meanwhile.
     if (!prayer || prayer.status !== 'pending') return false;
     await applyAnswer(ctx, prayer, args.accept, args.message, args.reason || 'decided for you');
+    // The judge already said what granting it means, so no second model call.
+    const m = args.effect.match(/(wellbeing|food|wood|stone)\s*\+?\s*(\d+)/i);
+    if (args.accept && m) {
+      const kind = m[1].toLowerCase();
+      const amount = Math.min(kind === 'wellbeing' ? 20 : 10, Number(m[2]));
+      if (kind === 'wellbeing') {
+        await adjustWellbeing(ctx, prayer.worldId, prayer.playerId, amount);
+      } else {
+        await insertInput(ctx, prayer.worldId, 'addResources', { [kind]: amount });
+      }
+    }
     return true;
   },
 });
@@ -414,7 +494,7 @@ export const rememberAnswer = internalAction({
         : `${prayed} I heard nothing back. Only silence.`;
     }
     // A granted prayer changes something in the world.
-    if (prayer.status === 'accepted' && prayer.text) {
+    if (prayer.status === 'accepted' && prayer.text && !prayer.autoReason) {
       await ctx.scheduler.runAfter(0, internal.god.admin.grantPrayer, {
         worldId: prayer.worldId,
         name: prayer.name,

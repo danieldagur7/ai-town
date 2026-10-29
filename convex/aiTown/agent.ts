@@ -26,7 +26,7 @@ import { DAY_LENGTH, clockState, isSleepTime, isWindDown } from './clock';
 import { bedFor } from './beds';
 import { playerGathering, tickGatheringMember } from './gathering';
 import { Player } from './player';
-import { BED_WALK_TIMEOUT } from '../constants';
+import { BED_WALK_TIMEOUT, PRAYER_CHANCE } from '../constants';
 import { GOD_CHARACTER } from '../../data/characters';
 import { Job, tickWorker } from './project';
 
@@ -350,12 +350,13 @@ export class Agent {
       player.activity = { description: SLEEPING, emoji: '😴', until: now + DAY_LENGTH };
       // Say a prayer before sleeping. It's generated outside the engine, and
       // doesn't hold up the agent like an operation would.
-      game.scheduleOperation('requestPrayer', {
-        worldId: game.worldId,
-        playerId: player.id,
-        agentId: this.id,
-        night: clockState(game.world.clock!.elapsed).day,
-      });
+      if (Math.random() < PRAYER_CHANCE)
+        game.scheduleOperation('requestPrayer', {
+          worldId: game.worldId,
+          playerId: player.id,
+          agentId: this.id,
+          night: clockState(game.world.clock!.elapsed).day,
+        });
     }
   }
 

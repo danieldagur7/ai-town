@@ -11,7 +11,7 @@ import { Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import { playerId } from '../aiTown/ids';
 import { chatCompletion } from '../util/llm';
-import { MAX_DECREES_IN_PROMPT } from '../constants';
+import { MAX_DECREES_IN_PROMPT, DECREE_OPINION_COOLDOWN } from '../constants';
 
 const selfInternal = internal.god.decrees;
 
@@ -156,6 +156,14 @@ export const summarizeDecreeTalk = internalAction({
       if (!words.some((w) => ownLines.includes(w))) {
         continue;
       }
+      // One opinion per person per decree every DECREE_OPINION_COOLDOWN is plenty.
+      const recent = await ctx.runQuery(selfInternal.hasRecentOpinion, {
+        decreeId: decree._id,
+        playerId: args.playerId,
+      });
+      if (recent) {
+        continue;
+      }
       const { content } = await chatCompletion({
         messages: [
           {
@@ -184,6 +192,86 @@ export const summarizeDecreeTalk = internalAction({
         text,
       });
     }
+  },
+});
+
+// After a group chat or meeting: one call per decree covers everyone who
+// talked about it (instead of one call per person).
+export const summarizeGroupDecreeTalk = internalAction({
+  args: {
+    worldId: v.id('worlds'),
+    people: v.array(v.object({ playerId, name: v.string() })),
+    transcript: v.array(v.object({ author: v.string(), text: v.string() })),
+  },
+  handler: async (ctx, args) => {
+    const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, { worldId: args.worldId });
+    const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
+    for (const decree of decrees) {
+      const words = [...keywords(decree.text), 'decree'];
+      const talkers = [];
+      for (const p of args.people) {
+        const own = args.transcript
+          .filter((m) => m.author === p.name)
+          .map((m) => m.text.toLowerCase())
+          .join(' ');
+        if (!words.some((w) => own.includes(w))) continue;
+        if (
+          await ctx.runQuery(selfInternal.hasRecentOpinion, {
+            decreeId: decree._id,
+            playerId: p.playerId,
+          })
+        )
+          continue;
+        talkers.push(p);
+      }
+      if (talkers.length === 0) continue;
+      const { content } = await chatCompletion({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              lines,
+              `The town's god has decreed: "${decree.text}"`,
+              `For each of ${talkers.map((t) => t.name).join(', ')}: one short third-person sentence ` +
+                'on what they said or feel about this decree, or "NONE". Reply with JSON only: ' +
+                '{"<name>": "<sentence or NONE>", ...}',
+            ].join('\n'),
+          },
+        ],
+        max_tokens: 60 * talkers.length,
+        response_format: { type: 'json_object' },
+      } as any);
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+      } catch {
+        continue;
+      }
+      for (const t of talkers) {
+        const text = String(parsed[t.name] ?? '').trim();
+        if (!text || /^none\b/i.test(text)) continue;
+        await ctx.runMutation(selfInternal.insertOpinion, {
+          worldId: args.worldId,
+          decreeId: decree._id,
+          playerId: t.playerId,
+          name: t.name,
+          text,
+        });
+      }
+    }
+  },
+});
+
+export const hasRecentOpinion = internalQuery({
+  args: { decreeId: v.id('decrees'), playerId },
+  handler: async (ctx, args) => {
+    const latest = await ctx.db
+      .query('decreeOpinions')
+      .withIndex('decreeId', (q) => q.eq('decreeId', args.decreeId))
+      .order('desc')
+      .filter((q) => q.eq(q.field('playerId'), args.playerId))
+      .first();
+    return !!latest && latest._creationTime > Date.now() - DECREE_OPINION_COOLDOWN;
   },
 });
 

@@ -32,6 +32,8 @@ export const godTables = {
     answered: v.optional(v.number()),
     // Set when the auto-answer decided: why it accepted or declined.
     autoReason: v.optional(v.string()),
+    // Set while auto-answer is judging it, so overlapping runs skip it.
+    deciding: v.optional(v.number()),
   })
     .index('player_night', ['worldId', 'playerId', 'night'])
     .index('status', ['worldId', 'status'])

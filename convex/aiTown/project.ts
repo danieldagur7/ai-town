@@ -150,10 +150,6 @@ export function startProject(
       ? `${args.proposer} got the town building ${args.name}.`
       : `The town started building ${args.name}.`,
   });
-  game.scheduleOperation('considerTownMeeting', {
-    worldId: game.worldId,
-    reason: `The town has started building ${args.name}.`,
-  });
   return structureId;
 }
 

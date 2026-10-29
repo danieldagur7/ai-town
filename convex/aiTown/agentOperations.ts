@@ -144,11 +144,17 @@ export const agentDoSomething = internalAction({
           worldId: args.worldId,
           playerId: player.id,
         });
-        const riskyChance = RISKY_ACTIVITY_CHANCE * (wellbeing < 35 ? 2 : 1);
-        const pool = ACTIVITIES.filter((a) =>
-          Math.random() < riskyChance ? a.risk > 0 : a.risk === 0,
+        // Kids are reckless, and so are people in low spirits. The town learns:
+        // every accident makes that activity less tempting for everyone.
+        const riskyChance =
+          RISKY_ACTIVITY_CHANCE * (wellbeing < 35 ? 2 : 1) * (agent.child ? 1.5 : 1);
+        const lessons = await ctx.runQuery(internal.life.lessons, { worldId: args.worldId });
+        const risky = Math.random() < riskyChance;
+        const pool = ACTIVITIES.filter((a) => (risky ? a.risk > 0 : a.risk === 0)).filter(
+          (a) => !risky || Math.random() < 1 / (1 + (lessons[a.description] ?? 0)),
         );
-        const activity = pool[Math.floor(Math.random() * pool.length)];
+        const choices = pool.length > 0 ? pool : ACTIVITIES.filter((a) => a.risk === 0);
+        const activity = choices[Math.floor(Math.random() * choices.length)];
         if (activity.risk > 0) {
           const roll = Math.random();
           if (roll < activity.risk * INJURY_FACTOR) {

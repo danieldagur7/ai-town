@@ -194,6 +194,10 @@ export function startGathering(
   others: Player[],
   topic: string,
 ) {
+  // One group chat at a time keeps the LLM queue short (meetings still happen).
+  if (kind === 'group' && game.world.gatherings.length > 0) {
+    return null;
+  }
   const people = [caller, ...others].filter(
     (p) => !playerGathering(game, p.id) && !game.world.playerConversation(p),
   );

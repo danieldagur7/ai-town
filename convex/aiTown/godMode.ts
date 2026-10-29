@@ -104,6 +104,21 @@ export const godModeInputs = {
       return game.world.era;
     },
   }),
+  // Add to the stockpile (a granted prayer, say).
+  addResources: inputHandler({
+    args: {
+      wood: v.optional(v.number()),
+      stone: v.optional(v.number()),
+      food: v.optional(v.number()),
+    },
+    handler: (game, _now, args) => {
+      const r = game.world.resources;
+      for (const key of ['wood', 'stone', 'food'] as const) {
+        r[key] = Math.max(0, r[key] + (args[key] ?? 0));
+      }
+      return null;
+    },
+  }),
   // The manifested god speaks: everyone within `radius` tiles sees and hears it.
   godSpeaks: inputHandler({
     args: { words: v.string(), radius: v.number() },

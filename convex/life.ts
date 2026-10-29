@@ -49,6 +49,13 @@ export const lifeTables = {
     // Mental health, 0-100 (WELLBEING_START when missing).
     wellbeing: v.optional(v.number()),
   }).index('player', ['worldId', 'playerId']),
+  // What the town has learned the hard way: accidents per activity. Each one
+  // makes that activity less likely to be picked (a death counts 3 times).
+  lessons: defineTable({
+    worldId: v.id('worlds'),
+    activity: v.string(),
+    weight: v.number(),
+  }).index('activity', ['worldId', 'activity']),
 };
 
 const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
@@ -128,6 +135,29 @@ export const changeEveryonesWellbeing = internalMutation({
   },
 });
 
+export const learnLesson = internalMutation({
+  args: { worldId: v.id('worlds'), activity: v.string(), weight: v.number() },
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query('lessons')
+      .withIndex('activity', (q) => q.eq('worldId', args.worldId).eq('activity', args.activity))
+      .first();
+    if (row) await ctx.db.patch(row._id, { weight: row.weight + args.weight });
+    else await ctx.db.insert('lessons', args);
+  },
+});
+
+export const lessons = internalQuery({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }) => {
+    const rows = await ctx.db
+      .query('lessons')
+      .withIndex('activity', (q) => q.eq('worldId', worldId))
+      .collect();
+    return Object.fromEntries(rows.map((r) => [r.activity, r.weight])) as Record<string, number>;
+  },
+});
+
 // Admin console: the god ends someone's life.
 export const godKills = internalAction({
   args: { worldId: v.id('worlds'), playerId: v.string(), cause: v.string() },
@@ -173,8 +203,18 @@ export const accident = internalAction({
     const data = await ctx.runQuery(internal.life.lifeData, { worldId: args.worldId });
     const person = data?.people.find((p) => p.playerId === args.playerId);
     if (!data || !person) return;
+    await ctx.runMutation(internal.life.learnLesson, {
+      worldId: args.worldId,
+      activity: args.activity,
+      weight: args.fatal ? 3 : 1,
+    });
     if (args.fatal) {
       await die(ctx, args.worldId, person, `an accident while ${args.activity}`, data.day);
+      await ctx.runAction(internal.life.rememberLifeEvent, {
+        worldId: args.worldId,
+        text: `After ${person.name} died ${args.activity}, I know how dangerous it is. I'll be more careful.`,
+        importance: 7,
+      });
       return;
     }
     await ctx.runMutation(internal.life.changeWellbeing, {
@@ -189,7 +229,7 @@ export const accident = internalAction({
     });
     await ctx.runAction(internal.life.rememberLifeEvent, {
       worldId: args.worldId,
-      text: `${person.name} got badly hurt while ${args.activity}.`,
+      text: `${person.name} got badly hurt while ${args.activity}. It's more dangerous than it looks.`,
       importance: 6,
     });
   },

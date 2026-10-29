@@ -163,8 +163,17 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   good; then create a new one or `playAsHeir` (take over your child: their agent is
   removed and feelings toward them carry over). Can work (wood/stone/farm/build), pray,
   join and speak in gatherings, and be a parent.
-- **Memory cost**: `rememberConversation` uses one JSON call for summary, importance and
-  feeling change (was three).
+- **LLM budget** (Ollama runs one request at a time, so everything queues): one JSON
+  call per remembered conversation (summary + importance + feeling change); one call per
+  prayer (prayer + summary, plus the decision and effect when auto-answer is on);
+  prayers are claimed (`deciding`) so overlapping runs never judge one twice; decree
+  opinions have a cooldown and one call per gathering; at most `MAX_AI_CONVERSATIONS`
+  townsperson-only conversations and one group chat at a time; each agent prays with
+  `PRAYER_CHANCE`. The image server loads its model on demand and frees it after 60 s
+  idle (it shares GPU memory with Ollama). Diagnose slowness by counting
+  `lsof -iTCP:11434 -sTCP:ESTABLISHED` connections and `npx convex logs`.
+- **Lessons** (`lessons` table in `convex/life.ts`): each accident makes that activity
+  less likely for everyone (deaths count 3×); kids take more risks.
 - **Local pixel-art generation**: `scripts/generate_sprite.py` (SDXL-Turbo +
   pixel-art-xl LoRA on MPS, background keyed out, nearest-neighbour downscale).
   Run with the venv in `../imagegen`:

@@ -5,7 +5,7 @@ import { conversationId, playerId } from './ids';
 import { Player } from './player';
 import { inputHandler } from './inputHandler';
 
-import { TYPING_TIMEOUT, CONVERSATION_DISTANCE } from '../constants';
+import { TYPING_TIMEOUT, CONVERSATION_DISTANCE, MAX_AI_CONVERSATIONS } from '../constants';
 import { distance, normalize, vector } from '../util/geometry';
 import { Point } from '../util/types';
 import { Game } from './game';
@@ -139,6 +139,16 @@ export class Conversation {
       const reason = `Player ${player.id} is already in a conversation`;
       console.log(reason);
       return { error: reason };
+    }
+    // Keep the LLM queue short: only a couple of townsperson-only conversations
+    // at a time. Conversations with a human always go ahead.
+    if (!player.human && !invitee.human) {
+      const aiOnly = [...game.world.conversations.values()].filter((c) =>
+        [...c.participants.keys()].every((id) => !game.world.players.get(id)?.human),
+      ).length;
+      if (aiOnly >= MAX_AI_CONVERSATIONS) {
+        return { error: 'Too many conversations at once' };
+      }
     }
     const conversationId = game.allocId('conversations');
     console.log(`Creating conversation ${conversationId}`);
