@@ -36,23 +36,27 @@ export const agentRememberConversation = internalAction({
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId);
-    await rememberConversation(
-      ctx,
-      args.worldId,
-      args.agentId as GameId<'agents'>,
-      args.playerId as GameId<'players'>,
-      args.conversationId as GameId<'conversations'>,
-    );
-    await sleep(Math.random() * 1000);
-    await ctx.runMutation(api.aiTown.main.sendInput, {
-      worldId: args.worldId,
-      name: 'finishRememberConversation',
-      args: {
-        agentId: args.agentId,
-        operationId: args.operationId,
-      },
-    });
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      await rememberConversation(
+        ctx,
+        args.worldId,
+        args.agentId as GameId<'agents'>,
+        args.playerId as GameId<'players'>,
+        args.conversationId as GameId<'conversations'>,
+      );
+      await sleep(Math.random() * 1000);
+      await ctx.runMutation(api.aiTown.main.sendInput, {
+        worldId: args.worldId,
+        name: 'finishRememberConversation',
+        args: {
+          agentId: args.agentId,
+          operationId: args.operationId,
+        },
+      });
+    } finally {
+      await release();
+    }
   },
 });
 
@@ -68,42 +72,62 @@ export const agentGenerateMessage = internalAction({
     messageUuid: v.string(),
   },
   handler: async (ctx, args) => {
-    // Townspeople chatting among themselves let the player's conversation go first.
-    await yieldToPlayer(ctx, args.worldId, args.conversationId);
-    let completionFn;
-    switch (args.type) {
-      case 'start':
-        completionFn = startConversationMessage;
-        break;
-      case 'continue':
-        completionFn = continueConversationMessage;
-        break;
-      case 'leave':
-        completionFn = leaveConversationMessage;
-        break;
-      default:
-        assertNever(args.type);
-    }
-    const completion = await completionFn(
-      ctx,
-      args.worldId,
-      args.conversationId as GameId<'conversations'>,
-      args.playerId as GameId<'players'>,
-      args.otherPlayerId as GameId<'players'>,
-    );
-    // TODO: stream in the text instead of reading it all at once.
-    const text = cleanMessage(await completion.readAll());
-
-    await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
+    // Townspeople chatting among themselves let the player's conversation go
+    // first; a reply to a human never waits.
+    const status = await ctx.runQuery(internal.priority.conversationStatus, {
       worldId: args.worldId,
       conversationId: args.conversationId,
-      agentId: args.agentId,
-      playerId: args.playerId,
-      text,
-      messageUuid: args.messageUuid,
-      leaveConversation: args.type === 'leave',
-      operationId: args.operationId,
     });
+    if (!status.active) return;
+    let release = async () => {};
+    if (!status.withHuman) {
+      // Not longer than the agent's operation lasts (ACTION_TIMEOUT).
+      release = await yieldToPlayer(ctx, args.worldId, args.conversationId, 60_000);
+    }
+    try {
+      // It may have ended while we waited (night, the other person left).
+      const after = await ctx.runQuery(internal.priority.conversationStatus, {
+        worldId: args.worldId,
+        conversationId: args.conversationId,
+      });
+      if (!after.active) return;
+      let completionFn;
+      switch (args.type) {
+        case 'start':
+          completionFn = startConversationMessage;
+          break;
+        case 'continue':
+          completionFn = continueConversationMessage;
+          break;
+        case 'leave':
+          completionFn = leaveConversationMessage;
+          break;
+        default:
+          assertNever(args.type);
+      }
+      const completion = await completionFn(
+        ctx,
+        args.worldId,
+        args.conversationId as GameId<'conversations'>,
+        args.playerId as GameId<'players'>,
+        args.otherPlayerId as GameId<'players'>,
+      );
+      // TODO: stream in the text instead of reading it all at once.
+      const text = cleanMessage(await completion.readAll());
+
+      await ctx.runMutation(internal.aiTown.agent.agentSendMessage, {
+        worldId: args.worldId,
+        conversationId: args.conversationId,
+        agentId: args.agentId,
+        playerId: args.playerId,
+        text,
+        messageUuid: args.messageUuid,
+        leaveConversation: args.type === 'leave',
+        operationId: args.operationId,
+      });
+    } finally {
+      await release();
+    }
   },
 });
 
@@ -254,21 +278,25 @@ export const agentGatheringMessage = internalAction({
     operationId: v.string(),
   },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId, args.gatheringId);
-    let text;
+    const release = await yieldToPlayer(ctx, args.worldId, args.gatheringId);
     try {
-      text = await gatheringMessage(ctx, args.worldId, args.gatheringId, args.playerId);
-    } catch (e: any) {
-      console.error(`Gathering message failed: ${e.message ?? e}`);
+      let text;
+      try {
+        text = await gatheringMessage(ctx, args.worldId, args.gatheringId, args.playerId);
+      } catch (e: any) {
+        console.error(`Gathering message failed: ${e.message ?? e}`);
+      }
+      await ctx.runMutation(internal.agent.gathering.writeGatheringMessage, {
+        worldId: args.worldId,
+        gatheringId: args.gatheringId,
+        playerId: args.playerId,
+        agentId: args.agentId,
+        operationId: args.operationId,
+        messageUuid: args.messageUuid,
+        text,
+      });
+    } finally {
+      await release();
     }
-    await ctx.runMutation(internal.agent.gathering.writeGatheringMessage, {
-      worldId: args.worldId,
-      gatheringId: args.gatheringId,
-      playerId: args.playerId,
-      agentId: args.agentId,
-      operationId: args.operationId,
-      messageUuid: args.messageUuid,
-      text,
-    });
   },
 });

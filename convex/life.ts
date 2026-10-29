@@ -387,92 +387,96 @@ async function birth(
   parents: Person[],
   given?: { name?: string; description?: string },
 ) {
-  await yieldToPlayer(ctx, worldId);
-  const taken = data.names.join(', ');
-  const prompt =
-    parents.length === 2
-      ? `${parents[0].name} (${parents[0].identity}) and ${parents[1].name} ` +
-        `(${parents[1].identity}) just had a baby in their small town. Invent the baby: a first ` +
-        `name (not ${taken}) and a personality they will grow into, mixing traits from both parents.`
-      : `A newcomer is moving into a small town. Invent them: a first name (not ${taken}) and ` +
-        `a short personality and backstory.`;
-  const { content } = await chatCompletion({
-    messages: [
-      {
-        role: 'user',
-        content:
-          `${prompt}\nAlso pick the little idle habit that shows their personality, one of: ` +
-          QUIRK_NAMES.map((q) => `${q} (${QUIRKS[q]})`).join(', ') +
-          `.\nReply with one line: <Name> | <personality in under 30 words, third person> | <habit>`,
+  const release = await yieldToPlayer(ctx, worldId);
+  try {
+    const taken = data.names.join(', ');
+    const prompt =
+      parents.length === 2
+        ? `${parents[0].name} (${parents[0].identity}) and ${parents[1].name} ` +
+          `(${parents[1].identity}) just had a baby in their small town. Invent the baby: a first ` +
+          `name (not ${taken}) and a personality they will grow into, mixing traits from both parents.`
+        : `A newcomer is moving into a small town. Invent them: a first name (not ${taken}) and ` +
+          `a short personality and backstory.`;
+    const { content } = await chatCompletion({
+      messages: [
+        {
+          role: 'user',
+          content:
+            `${prompt}\nAlso pick the little idle habit that shows their personality, one of: ` +
+            QUIRK_NAMES.map((q) => `${q} (${QUIRKS[q]})`).join(', ') +
+            `.\nReply with one line: <Name> | <personality in under 30 words, third person> | <habit>`,
+        },
+      ],
+      max_tokens: 80,
+    });
+    let [rawName, rawIdentity, rawQuirk] = content.trim().split('\n')[0].split('|');
+    if (given?.name) rawName = given.name;
+    if (given?.description) rawIdentity = given.description;
+    const name = rawName
+      ?.replace(/[^A-Za-z' -]/g, '')
+      .trim()
+      .split(' ')[0];
+    if (!name || data.names.includes(name)) {
+      console.error(`Couldn't use invented resident: ${content}`);
+      return;
+    }
+    const identity =
+      (parents.length === 2
+        ? `${name} is the child of ${parents[0].name} and ${parents[1].name}. `
+        : `${name} recently moved to town. `) + (rawIdentity ?? '').trim();
+    // Their look comes from the feature wheel; a baby takes after its parents.
+    const quirk = QUIRK_NAMES.find((q) => rawQuirk?.toLowerCase().includes(q));
+    const character = lookString(
+      parents.length === 2
+        ? childLook(parents[0].character, parents[1].character, quirk)
+        : randomLook(quirk),
+    );
+    const inputId = await ctx.runMutation(api.aiTown.main.sendInput, {
+      worldId,
+      name: 'residentBorn',
+      args: {
+        name,
+        character,
+        identity,
+        plan:
+          parents.length === 2 ? 'You want to grow up and find your place.' : 'You want to fit in.',
+        child: parents.length === 2,
+        parentIds: parents.map((p) => p.playerId),
       },
-    ],
-    max_tokens: 80,
-  });
-  let [rawName, rawIdentity, rawQuirk] = content.trim().split('\n')[0].split('|');
-  if (given?.name) rawName = given.name;
-  if (given?.description) rawIdentity = given.description;
-  const name = rawName
-    ?.replace(/[^A-Za-z' -]/g, '')
-    .trim()
-    .split(' ')[0];
-  if (!name || data.names.includes(name)) {
-    console.error(`Couldn't use invented resident: ${content}`);
-    return;
-  }
-  const identity =
-    (parents.length === 2
-      ? `${name} is the child of ${parents[0].name} and ${parents[1].name}. `
-      : `${name} recently moved to town. `) + (rawIdentity ?? '').trim();
-  // Their look comes from the feature wheel; a baby takes after its parents.
-  const quirk = QUIRK_NAMES.find((q) => rawQuirk?.toLowerCase().includes(q));
-  const character = lookString(
-    parents.length === 2
-      ? childLook(parents[0].character, parents[1].character, quirk)
-      : randomLook(quirk),
-  );
-  const inputId = await ctx.runMutation(api.aiTown.main.sendInput, {
-    worldId,
-    name: 'residentBorn',
-    args: {
+    });
+    // Wait for the engine to create them, to learn their player id.
+    let playerId: string | undefined;
+    for (let i = 0; i < 60 && !playerId; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const status: any = await ctx.runQuery(api.aiTown.main.inputStatus, { inputId });
+      if (status?.kind === 'ok') playerId = status.value.playerId;
+      if (status?.kind === 'error') throw new Error(status.message);
+    }
+    if (!playerId) return;
+    const startAge = parents.length === 2 ? 0 : Math.round(rand(20, 35));
+    await ctx.runMutation(internal.life.addResident, {
+      worldId,
+      playerId,
       name,
-      character,
-      identity,
-      plan:
-        parents.length === 2 ? 'You want to grow up and find your place.' : 'You want to fit in.',
-      child: parents.length === 2,
-      parentIds: parents.map((p) => p.playerId),
-    },
-  });
-  // Wait for the engine to create them, to learn their player id.
-  let playerId: string | undefined;
-  for (let i = 0; i < 60 && !playerId; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const status: any = await ctx.runQuery(api.aiTown.main.inputStatus, { inputId });
-    if (status?.kind === 'ok') playerId = status.value.playerId;
-    if (status?.kind === 'error') throw new Error(status.message);
+      bornDay: day - startAge / YEARS_PER_DAY,
+      deathAge: Math.round(rand(LIFESPAN_MIN, LIFESPAN_MAX)),
+      parents: parents.map((p) => p.playerId),
+    });
+    const text =
+      parents.length === 2
+        ? `${parents[0].name} and ${parents[1].name} had a baby: ${name}!`
+        : `${name} moved to town.`;
+    await ctx.runMutation(internal.society.townEvent, {
+      worldId,
+      emoji: parents.length === 2 ? '👶' : '🧳',
+      text,
+    });
+    await ctx.runAction(internal.life.rememberLifeEvent, { worldId, text, importance: 7 });
+    await ctx.runMutation(internal.life.changeEveryonesWellbeing, { worldId, delta: 5 });
+    await ctx.runMutation(internal.agent.relationships.seedRelationships, { worldId });
+  } finally {
+    await release();
   }
-  if (!playerId) return;
-  const startAge = parents.length === 2 ? 0 : Math.round(rand(20, 35));
-  await ctx.runMutation(internal.life.addResident, {
-    worldId,
-    playerId,
-    name,
-    bornDay: day - startAge / YEARS_PER_DAY,
-    deathAge: Math.round(rand(LIFESPAN_MIN, LIFESPAN_MAX)),
-    parents: parents.map((p) => p.playerId),
-  });
-  const text =
-    parents.length === 2
-      ? `${parents[0].name} and ${parents[1].name} had a baby: ${name}!`
-      : `${name} moved to town.`;
-  await ctx.runMutation(internal.society.townEvent, {
-    worldId,
-    emoji: parents.length === 2 ? '👶' : '🧳',
-    text,
-  });
-  await ctx.runAction(internal.life.rememberLifeEvent, { worldId, text, importance: 7 });
-  await ctx.runMutation(internal.life.changeEveryonesWellbeing, { worldId, delta: 5 });
-  await ctx.runMutation(internal.agent.relationships.seedRelationships, { worldId });
 }
 
 export const lifeData = internalQuery({

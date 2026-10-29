@@ -141,28 +141,32 @@ export const processQueue = internalAction({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, { worldId }) => {
     for (;;) {
-      await yieldToPlayer(ctx, worldId);
-      const prayer = await ctx.runMutation(selfInternal.claimNext, { worldId });
-      if (!prayer) {
-        return;
-      }
-      let result;
+      const release = await yieldToPlayer(ctx, worldId);
       try {
-        result = await generatePrayer(ctx, prayer);
-      } catch (e: any) {
-        console.error(`Prayer for ${prayer.name} failed: ${e.message ?? e}`);
-      }
-      await ctx.runMutation(selfInternal.finishPrayer, {
-        prayerId: prayer._id,
-        text: result?.text,
-        summary: result?.summary,
-        decided: !!result?.decision,
-      });
-      if (result?.decision) {
-        await ctx.runMutation(selfInternal.applyAutoAnswer, {
+        const prayer = await ctx.runMutation(selfInternal.claimNext, { worldId });
+        if (!prayer) {
+          return;
+        }
+        let result;
+        try {
+          result = await generatePrayer(ctx, prayer);
+        } catch (e: any) {
+          console.error(`Prayer for ${prayer.name} failed: ${e.message ?? e}`);
+        }
+        await ctx.runMutation(selfInternal.finishPrayer, {
           prayerId: prayer._id,
-          ...result.decision,
+          text: result?.text,
+          summary: result?.summary,
+          decided: !!result?.decision,
         });
+        if (result?.decision) {
+          await ctx.runMutation(selfInternal.applyAutoAnswer, {
+            prayerId: prayer._id,
+            ...result.decision,
+          });
+        }
+      } finally {
+        await release();
       }
     }
   },
@@ -320,26 +324,30 @@ async function applyAnswer(
 export const autoAnswerPrayers = action({
   args: { worldId: v.id('worlds'), prayerId: v.optional(v.id('prayers')) },
   handler: async (ctx, args): Promise<{ name: string; accept: boolean; reason: string }[]> => {
-    await yieldToPlayer(ctx, args.worldId);
-    const data = await ctx.runQuery(selfInternal.autoAnswerData, args);
-    const results = [];
-    for (const prayer of data.prayers) {
-      // Several runs can overlap (new prayers, "Decide all"); judge each prayer once.
-      const mine = await ctx.runMutation(selfInternal.claimForDecision, { prayerId: prayer._id });
-      if (!mine) continue;
-      const decision = await judgePrayer(prayer, data.decrees);
-      if (!decision) {
-        await ctx.runMutation(selfInternal.releaseDecision, { prayerId: prayer._id });
-        continue;
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      const data = await ctx.runQuery(selfInternal.autoAnswerData, args);
+      const results = [];
+      for (const prayer of data.prayers) {
+        // Several runs can overlap (new prayers, "Decide all"); judge each prayer once.
+        const mine = await ctx.runMutation(selfInternal.claimForDecision, { prayerId: prayer._id });
+        if (!mine) continue;
+        const decision = await judgePrayer(prayer, data.decrees);
+        if (!decision) {
+          await ctx.runMutation(selfInternal.releaseDecision, { prayerId: prayer._id });
+          continue;
+        }
+        const applied = await ctx.runMutation(selfInternal.applyAutoAnswer, {
+          prayerId: prayer._id,
+          ...decision,
+        });
+        if (applied)
+          results.push({ name: prayer.name, accept: decision.accept, reason: decision.reason });
       }
-      const applied = await ctx.runMutation(selfInternal.applyAutoAnswer, {
-        prayerId: prayer._id,
-        ...decision,
-      });
-      if (applied)
-        results.push({ name: prayer.name, accept: decision.accept, reason: decision.reason });
+      return results;
+    } finally {
+      await release();
     }
-    return results;
   },
 });
 

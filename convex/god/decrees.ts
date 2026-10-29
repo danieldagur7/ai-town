@@ -144,55 +144,59 @@ export const summarizeDecreeTalk = internalAction({
     transcript: v.array(v.object({ author: v.string(), text: v.string() })),
   },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId);
-    const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, {
-      worldId: args.worldId,
-    });
-    const ownLines = args.transcript
-      .filter((m) => m.author === args.name)
-      .map((m) => m.text.toLowerCase())
-      .join(' ');
-    const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
-    for (const decree of decrees) {
-      const words = [...keywords(decree.text), 'decree'];
-      if (!words.some((w) => ownLines.includes(w))) {
-        continue;
-      }
-      // One opinion per person per decree every DECREE_OPINION_COOLDOWN is plenty.
-      const recent = await ctx.runQuery(selfInternal.hasRecentOpinion, {
-        decreeId: decree._id,
-        playerId: args.playerId,
-      });
-      if (recent) {
-        continue;
-      }
-      const { content } = await chatCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: [
-              `Here is a conversation between ${args.name} and ${args.otherName}:`,
-              lines,
-              `The unseen god of the town has decreed: "${decree.text}"`,
-              `Did ${args.name} say anything about this decree or what it asks for? If yes, ` +
-                `reply with one short sentence in third person, starting with "${args.name}", ` +
-                `summing up what ${args.name} said or feels about it. If not, reply exactly NONE.`,
-            ].join('\n'),
-          },
-        ],
-        max_tokens: 80,
-      });
-      const text = content.trim();
-      if (!text || /^none\b/i.test(text)) {
-        continue;
-      }
-      await ctx.runMutation(selfInternal.insertOpinion, {
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, {
         worldId: args.worldId,
-        decreeId: decree._id,
-        playerId: args.playerId,
-        name: args.name,
-        text,
       });
+      const ownLines = args.transcript
+        .filter((m) => m.author === args.name)
+        .map((m) => m.text.toLowerCase())
+        .join(' ');
+      const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
+      for (const decree of decrees) {
+        const words = [...keywords(decree.text), 'decree'];
+        if (!words.some((w) => ownLines.includes(w))) {
+          continue;
+        }
+        // One opinion per person per decree every DECREE_OPINION_COOLDOWN is plenty.
+        const recent = await ctx.runQuery(selfInternal.hasRecentOpinion, {
+          decreeId: decree._id,
+          playerId: args.playerId,
+        });
+        if (recent) {
+          continue;
+        }
+        const { content } = await chatCompletion({
+          messages: [
+            {
+              role: 'user',
+              content: [
+                `Here is a conversation between ${args.name} and ${args.otherName}:`,
+                lines,
+                `The unseen god of the town has decreed: "${decree.text}"`,
+                `Did ${args.name} say anything about this decree or what it asks for? If yes, ` +
+                  `reply with one short sentence in third person, starting with "${args.name}", ` +
+                  `summing up what ${args.name} said or feels about it. If not, reply exactly NONE.`,
+              ].join('\n'),
+            },
+          ],
+          max_tokens: 80,
+        });
+        const text = content.trim();
+        if (!text || /^none\b/i.test(text)) {
+          continue;
+        }
+        await ctx.runMutation(selfInternal.insertOpinion, {
+          worldId: args.worldId,
+          decreeId: decree._id,
+          playerId: args.playerId,
+          name: args.name,
+          text,
+        });
+      }
+    } finally {
+      await release();
     }
   },
 });
@@ -206,61 +210,67 @@ export const summarizeGroupDecreeTalk = internalAction({
     transcript: v.array(v.object({ author: v.string(), text: v.string() })),
   },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId);
-    const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, { worldId: args.worldId });
-    const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
-    for (const decree of decrees) {
-      const words = [...keywords(decree.text), 'decree'];
-      const talkers = [];
-      for (const p of args.people) {
-        const own = args.transcript
-          .filter((m) => m.author === p.name)
-          .map((m) => m.text.toLowerCase())
-          .join(' ');
-        if (!words.some((w) => own.includes(w))) continue;
-        if (
-          await ctx.runQuery(selfInternal.hasRecentOpinion, {
-            decreeId: decree._id,
-            playerId: p.playerId,
-          })
-        )
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      const decrees = await ctx.runQuery(selfInternal.activeDecreesQuery, {
+        worldId: args.worldId,
+      });
+      const lines = args.transcript.map((m) => `${m.author}: ${m.text}`).join('\n');
+      for (const decree of decrees) {
+        const words = [...keywords(decree.text), 'decree'];
+        const talkers = [];
+        for (const p of args.people) {
+          const own = args.transcript
+            .filter((m) => m.author === p.name)
+            .map((m) => m.text.toLowerCase())
+            .join(' ');
+          if (!words.some((w) => own.includes(w))) continue;
+          if (
+            await ctx.runQuery(selfInternal.hasRecentOpinion, {
+              decreeId: decree._id,
+              playerId: p.playerId,
+            })
+          )
+            continue;
+          talkers.push(p);
+        }
+        if (talkers.length === 0) continue;
+        const { content } = await chatCompletion({
+          messages: [
+            {
+              role: 'user',
+              content: [
+                lines,
+                `The town's god has decreed: "${decree.text}"`,
+                `For each of ${talkers.map((t) => t.name).join(', ')}: one short third-person sentence ` +
+                  'on what they said or feel about this decree, or "NONE". Reply with JSON only: ' +
+                  '{"<name>": "<sentence or NONE>", ...}',
+              ].join('\n'),
+            },
+          ],
+          max_tokens: 60 * talkers.length,
+          response_format: { type: 'json_object' },
+        } as any);
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+        } catch {
           continue;
-        talkers.push(p);
+        }
+        for (const t of talkers) {
+          const text = String(parsed[t.name] ?? '').trim();
+          if (!text || /^none\b/i.test(text)) continue;
+          await ctx.runMutation(selfInternal.insertOpinion, {
+            worldId: args.worldId,
+            decreeId: decree._id,
+            playerId: t.playerId,
+            name: t.name,
+            text,
+          });
+        }
       }
-      if (talkers.length === 0) continue;
-      const { content } = await chatCompletion({
-        messages: [
-          {
-            role: 'user',
-            content: [
-              lines,
-              `The town's god has decreed: "${decree.text}"`,
-              `For each of ${talkers.map((t) => t.name).join(', ')}: one short third-person sentence ` +
-                'on what they said or feel about this decree, or "NONE". Reply with JSON only: ' +
-                '{"<name>": "<sentence or NONE>", ...}',
-            ].join('\n'),
-          },
-        ],
-        max_tokens: 60 * talkers.length,
-        response_format: { type: 'json_object' },
-      } as any);
-      let parsed: Record<string, unknown> = {};
-      try {
-        parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-      } catch {
-        continue;
-      }
-      for (const t of talkers) {
-        const text = String(parsed[t.name] ?? '').trim();
-        if (!text || /^none\b/i.test(text)) continue;
-        await ctx.runMutation(selfInternal.insertOpinion, {
-          worldId: args.worldId,
-          decreeId: decree._id,
-          playerId: t.playerId,
-          name: t.name,
-          text,
-        });
-      }
+    } finally {
+      await release();
     }
   },
 });

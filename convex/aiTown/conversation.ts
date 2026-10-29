@@ -213,6 +213,12 @@ export class Conversation {
       if (agent) {
         agent.lastConversation = now;
         agent.toRemember = this.id;
+        // A reply still being written for this conversation is moot: free the
+        // agent now rather than leaving it busy until the reply (or
+        // ACTION_TIMEOUT) arrives, so they can accept the next invite.
+        if (agent.inProgressOperation?.name === 'agentGenerateMessage') {
+          delete agent.inProgressOperation;
+        }
       }
     }
     game.world.conversations.delete(this.id);

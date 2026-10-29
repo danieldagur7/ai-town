@@ -50,54 +50,58 @@ export const recentEvents = query({
 export const proposeProject = internalAction({
   args: { worldId: v.id('worlds') },
   handler: async (ctx, { worldId }) => {
-    await yieldToPlayer(ctx, worldId);
-    const data = await ctx.runQuery(internal.society.proposalContext, { worldId });
-    if (!data || data.busy || data.townspeople.length === 0) return;
-    const era = eraOf(data.era);
-    const next = ERAS[data.era + 1];
-    const { content } = await chatCompletion({
-      messages: [
-        {
-          role: 'user',
-          content: [
-            `A small town is in its ${era.name} era: ${era.blurb}.`,
-            data.built.length > 0
-              ? `Already built: ${data.built.join(', ')}.`
-              : 'Nothing has been built yet.',
-            data.decrees.length > 0
-              ? `Their god has decreed: ${data.decrees.map((d) => `"${d}"`).join('; ')}.`
-              : '',
-            'Townspeople:',
-            ...data.townspeople.map((p) => `- ${p.name}: ${p.identity}`),
-            `Which townsperson proposes building something new, and what? It must fit the ` +
-              `${era.name} era (ideas: ${era.ideas})` +
-              (next
-                ? `, ideally something that helps the town progress toward the ${next.name} era`
-                : '') +
-              ", and not repeat what's built. Obey the god's decrees if they ask for a building.",
-            'Reply with exactly one line: <Name> | <building name, 2-5 words> | <what the outside of the building looks like, under 15 words>',
-          ]
-            .filter(Boolean)
-            .join('\n'),
-        },
-      ],
-      max_tokens: 60,
-    });
-    const parts = content
-      .trim()
-      .split('\n')[0]
-      .split('|')
-      .map((s) => s.replace(/[*"“”]/g, '').trim());
-    if (parts.length < 3) {
-      console.error(`Couldn't read project proposal: ${content}`);
-      return;
+    const release = await yieldToPlayer(ctx, worldId);
+    try {
+      const data = await ctx.runQuery(internal.society.proposalContext, { worldId });
+      if (!data || data.busy || data.townspeople.length === 0) return;
+      const era = eraOf(data.era);
+      const next = ERAS[data.era + 1];
+      const { content } = await chatCompletion({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              `A small town is in its ${era.name} era: ${era.blurb}.`,
+              data.built.length > 0
+                ? `Already built: ${data.built.join(', ')}.`
+                : 'Nothing has been built yet.',
+              data.decrees.length > 0
+                ? `Their god has decreed: ${data.decrees.map((d) => `"${d}"`).join('; ')}.`
+                : '',
+              'Townspeople:',
+              ...data.townspeople.map((p) => `- ${p.name}: ${p.identity}`),
+              `Which townsperson proposes building something new, and what? It must fit the ` +
+                `${era.name} era (ideas: ${era.ideas})` +
+                (next
+                  ? `, ideally something that helps the town progress toward the ${next.name} era`
+                  : '') +
+                ", and not repeat what's built. Obey the god's decrees if they ask for a building.",
+              'Reply with exactly one line: <Name> | <building name, 2-5 words> | <what the outside of the building looks like, under 15 words>',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          },
+        ],
+        max_tokens: 60,
+      });
+      const parts = content
+        .trim()
+        .split('\n')[0]
+        .split('|')
+        .map((s) => s.replace(/[*"“”]/g, '').trim());
+      if (parts.length < 3) {
+        console.error(`Couldn't read project proposal: ${content}`);
+        return;
+      }
+      const proposer = data.townspeople.find((p) => p.name === parts[0])?.name;
+      await ctx.runMutation(api.aiTown.main.sendInput, {
+        worldId,
+        name: 'startProject',
+        args: { name: parts[1].replace(/^(a|an|the)\s+/i, 'a '), subject: parts[2], proposer },
+      });
+    } finally {
+      await release();
     }
-    const proposer = data.townspeople.find((p) => p.name === parts[0])?.name;
-    await ctx.runMutation(api.aiTown.main.sendInput, {
-      worldId,
-      name: 'startProject',
-      args: { name: parts[1].replace(/^(a|an|the)\s+/i, 'a '), subject: parts[2], proposer },
-    });
   },
 });
 

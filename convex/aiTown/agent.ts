@@ -314,13 +314,16 @@ export class Agent {
   }
 
   startRemembering(game: Game, now: number) {
-    // Fire off the action to remember the conversation.
+    // Remember the conversation in the background. It isn't the agent's
+    // operation, so they stay free meanwhile (to accept the player's invite,
+    // say) instead of ignoring everyone until the summary is written.
     console.log(`Agent ${this.id} remembering conversation ${this.toRemember}`);
-    this.startOperation(game, now, 'agentRememberConversation', {
+    game.scheduleOperation('agentRememberConversation', {
       worldId: game.worldId,
       playerId: this.playerId,
       agentId: this.id,
       conversationId: this.toRemember!,
+      operationId: game.allocId('operations'),
     });
     delete this.toRemember;
   }

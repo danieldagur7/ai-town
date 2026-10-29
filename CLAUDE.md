@@ -180,8 +180,12 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   townsperson-only conversations and one group chat at a time; each agent prays with
   `PRAYER_CHANCE`. The image server loads its model on demand and frees it after 60 s
   idle (it shares GPU memory with Ollama). Player conversations come first: background
-  LLM work calls `yieldToPlayer` (`convex/priority.ts`) and waits while a human is
-  talking to someone. At bedtime nobody leaves a conversation with a human. Diagnose slowness by counting
+  LLM work calls `yieldToPlayer` (`convex/priority.ts`), which waits while a human is
+  talking to someone and then takes the single background turn (`llmLease` table;
+  release it in a `finally`), so Ollama never holds more than one background request
+  ahead of the player's. Replies to a human skip both. Remembering a conversation runs
+  in the background (not an agent operation), and a conversation ending frees any
+  participant still writing a reply for it, so nobody ignores the player's invite. At bedtime nobody leaves a conversation with a human. Diagnose slowness by counting
   `lsof -iTCP:11434 -sTCP:ESTABLISHED` connections and `npx convex logs`.
 - **Looks** (`data/looks.ts`): a player's `character` string packs a base sprite and
   feature-wheel picks, e.g. `f3~h2~o5~a:glasses~q:bouncy` (hair colour, outfit colour,

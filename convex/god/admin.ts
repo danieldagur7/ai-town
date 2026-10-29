@@ -84,14 +84,18 @@ const PRAYER_OPS = [
 export const grantPrayer = internalAction({
   args: { worldId: v.id('worlds'), name: v.string(), text: v.string() },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId);
-    await runAdmin(
-      ctx,
-      args.worldId,
-      `The god grants this prayer by ${args.name}: "${args.text}". Make it come true in a small, ` +
-        `believable way (a blessing, not a spectacle). Use one or two operations.`,
-      PRAYER_OPS,
-    );
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      await runAdmin(
+        ctx,
+        args.worldId,
+        `The god grants this prayer by ${args.name}: "${args.text}". Make it come true in a small, ` +
+          `believable way (a blessing, not a spectacle). Use one or two operations.`,
+        PRAYER_OPS,
+      );
+    } finally {
+      await release();
+    }
   },
 });
 

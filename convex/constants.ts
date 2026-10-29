@@ -245,6 +245,11 @@ export const DECREE_OPINION_COOLDOWN = 8 * 60_000;
 // Background LLM work waits up to this long while the player is talking to
 // someone, so their replies come first (see convex/priority.ts).
 export const PLAYER_PRIORITY_MAX_WAIT = 45_000;
+// One background LLM request at a time (convex/priority.ts). A turn nobody
+// releases (a crashed action) expires after LLM_LEASE_MS; work gives up waiting
+// for a turn after LLM_LEASE_MAX_WAIT and goes ahead anyway.
+export const LLM_LEASE_MS = 90_000;
+export const LLM_LEASE_MAX_WAIT = 180_000;
 
 // After the world pauses or is frozen, Ollama's models are unloaded at these
 // delays (ms) to free memory; they reload on the next request.

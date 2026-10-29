@@ -186,53 +186,58 @@ export const rememberGathering = internalAction({
     if (messages.length === 0) {
       return;
     }
-    await yieldToPlayer(ctx, args.worldId);
-    const names = [...new Set(messages.map((m) => m.authorName))];
-    const what = args.kind === 'meeting' ? `a town meeting about "${args.topic}"` : 'a group chat';
-    const { content } = await chatCompletion({
-      messages: [
-        {
-          role: 'user',
-          content:
-            `Summarize ${what} in two or three sentences: who said what, and what was decided, if anything.\n` +
-            messages.map((m) => `${m.authorName}: ${m.text}`).join('\n'),
-        },
-      ],
-      max_tokens: 150,
-    });
-    const description = `At ${what} with ${names.join(', ')}: ${content.trim()}`;
-    await ctx.runMutation(selfInternal.saveSummary, {
-      worldId: args.worldId,
-      gatheringId: args.gatheringId,
-      kind: args.kind,
-      topic: args.topic,
-      participants: names,
-      summary: content.trim(),
-    });
-    const { embedding } = await fetchEmbedding(description);
-    for (const p of args.participants) {
-      if (!p.agentId) continue;
-      await ctx.runMutation(internal.agent.memory.insertMemory, {
-        agentId: p.agentId,
-        playerId: p.playerId,
-        description,
-        importance: args.kind === 'meeting' ? 6 : 4,
-        lastAccess: Date.now(),
-        data: { type: 'gathering', gatheringId: args.gatheringId },
-        embedding,
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      const names = [...new Set(messages.map((m) => m.authorName))];
+      const what =
+        args.kind === 'meeting' ? `a town meeting about "${args.topic}"` : 'a group chat';
+      const { content } = await chatCompletion({
+        messages: [
+          {
+            role: 'user',
+            content:
+              `Summarize ${what} in two or three sentences: who said what, and what was decided, if anything.\n` +
+              messages.map((m) => `${m.authorName}: ${m.text}`).join('\n'),
+          },
+        ],
+        max_tokens: 150,
       });
+      const description = `At ${what} with ${names.join(', ')}: ${content.trim()}`;
+      await ctx.runMutation(selfInternal.saveSummary, {
+        worldId: args.worldId,
+        gatheringId: args.gatheringId,
+        kind: args.kind,
+        topic: args.topic,
+        participants: names,
+        summary: content.trim(),
+      });
+      const { embedding } = await fetchEmbedding(description);
+      for (const p of args.participants) {
+        if (!p.agentId) continue;
+        await ctx.runMutation(internal.agent.memory.insertMemory, {
+          agentId: p.agentId,
+          playerId: p.playerId,
+          description,
+          importance: args.kind === 'meeting' ? 6 : 4,
+          lastAccess: Date.now(),
+          data: { type: 'gathering', gatheringId: args.gatheringId },
+          embedding,
+        });
+      }
+      // Let the God menu see what people said about the decrees (one call for everyone).
+      const people = [];
+      for (const p of args.participants) {
+        const name = messages.find((m) => m.author === p.playerId)?.authorName;
+        if (name) people.push({ playerId: p.playerId, name });
+      }
+      await ctx.scheduler.runAfter(0, internal.god.decrees.summarizeGroupDecreeTalk, {
+        worldId: args.worldId,
+        people,
+        transcript: messages.map((m) => ({ author: m.authorName, text: m.text })),
+      });
+    } finally {
+      await release();
     }
-    // Let the God menu see what people said about the decrees (one call for everyone).
-    const people = [];
-    for (const p of args.participants) {
-      const name = messages.find((m) => m.author === p.playerId)?.authorName;
-      if (name) people.push({ playerId: p.playerId, name });
-    }
-    await ctx.scheduler.runAfter(0, internal.god.decrees.summarizeGroupDecreeTalk, {
-      worldId: args.worldId,
-      people,
-      transcript: messages.map((m) => ({ author: m.authorName, text: m.text })),
-    });
   },
 });
 
@@ -241,43 +246,47 @@ export const rememberGathering = internalAction({
 export const considerTownMeeting = internalAction({
   args: { worldId: v.id('worlds'), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    await yieldToPlayer(ctx, args.worldId);
-    const data = await ctx.runQuery(selfInternal.meetingContext, { worldId: args.worldId });
-    if (!data || data.alreadyMetToday || data.townspeople.length < 3) {
-      return;
+    const release = await yieldToPlayer(ctx, args.worldId);
+    try {
+      const data = await ctx.runQuery(selfInternal.meetingContext, { worldId: args.worldId });
+      if (!data || data.alreadyMetToday || data.townspeople.length < 3) {
+        return;
+      }
+      const events = [...data.events];
+      if (args.reason) events.push(args.reason);
+      if (events.length === 0) {
+        return;
+      }
+      const { content } = await chatCompletion({
+        messages: [
+          {
+            role: 'user',
+            content: [
+              'Townspeople:',
+              ...data.townspeople.map((p) => `- ${p.name}: ${p.identity}`),
+              "What's happening in town:",
+              ...events.map((e) => `- ${e}`),
+              'Would one of these townspeople call a town meeting on the plaza today to talk it ' +
+                'over? Only if it really matters to them. Reply NONE, or exactly ' +
+                '"<Name>: <topic in under 10 words>".',
+            ].join('\n'),
+          },
+        ],
+        max_tokens: 30,
+      });
+      const match = content.trim().match(/^([A-Za-z]+)\s*:\s*(.+)$/m);
+      const caller = match && data.townspeople.find((p) => p.name === match[1]);
+      if (!caller) {
+        return;
+      }
+      await ctx.runMutation(api.aiTown.main.sendInput, {
+        worldId: args.worldId,
+        name: 'callMeeting',
+        args: { callerId: caller.playerId, topic: match[2].replace(/["“”]/g, '').trim() },
+      });
+    } finally {
+      await release();
     }
-    const events = [...data.events];
-    if (args.reason) events.push(args.reason);
-    if (events.length === 0) {
-      return;
-    }
-    const { content } = await chatCompletion({
-      messages: [
-        {
-          role: 'user',
-          content: [
-            'Townspeople:',
-            ...data.townspeople.map((p) => `- ${p.name}: ${p.identity}`),
-            "What's happening in town:",
-            ...events.map((e) => `- ${e}`),
-            'Would one of these townspeople call a town meeting on the plaza today to talk it ' +
-              'over? Only if it really matters to them. Reply NONE, or exactly ' +
-              '"<Name>: <topic in under 10 words>".',
-          ].join('\n'),
-        },
-      ],
-      max_tokens: 30,
-    });
-    const match = content.trim().match(/^([A-Za-z]+)\s*:\s*(.+)$/m);
-    const caller = match && data.townspeople.find((p) => p.name === match[1]);
-    if (!caller) {
-      return;
-    }
-    await ctx.runMutation(api.aiTown.main.sendInput, {
-      worldId: args.worldId,
-      name: 'callMeeting',
-      args: { callerId: caller.playerId, topic: match[2].replace(/["“”]/g, '').trim() },
-    });
   },
 });
 

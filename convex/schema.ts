@@ -10,6 +10,7 @@ import { societyTables } from './society';
 import { lifeTables } from './life';
 import { adminTables } from './god/admin';
 import { heroTables } from './hero';
+import { llmLeaseTables } from './priority';
 
 export default defineSchema({
   music: defineTable({
@@ -35,5 +36,6 @@ export default defineSchema({
   ...societyTables,
   ...lifeTables,
   ...adminTables,
+  ...llmLeaseTables,
   ...heroTables,
 });
