@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation } from 'convex/react';
 import { toastOnError } from '../toasts';
 import { useSendInput } from '../hooks/sendInput';
@@ -8,15 +8,50 @@ import { Id } from '../../convex/_generated/dataModel';
 import { ServerGame } from '../hooks/serverGame';
 import { useGodUi } from '../godUi';
 
-// Cards for each group chat or town meeting in progress, with the transcript.
+type GatheringState = ServerGame['world']['gatherings'][number];
+
+// Cards for each group chat or town meeting, with the transcript. A town meeting's
+// card stays up after it ends, until you close it.
 export function Gatherings({ worldId, game }: { worldId: Id<'worlds'>; game: ServerGame }) {
-  if (game.world.gatherings.length === 0) {
+  const [ended, setEnded] = useState<Record<string, GatheringState>>({});
+  const [closed, setClosed] = useState<Set<string>>(new Set());
+  const [lastLive, setLastLive] = useState<Record<string, GatheringState>>({});
+  const live = game.world.gatherings;
+  // Remember meetings we've seen, and keep the ones that just ended.
+  useEffect(() => {
+    const liveIds = new Set(live.map((g) => g.id));
+    const justEnded = Object.values(lastLive).filter((g) => !liveIds.has(g.id));
+    if (justEnded.length > 0) {
+      setEnded((prev) => {
+        const next = { ...prev };
+        for (const g of justEnded) next[g.id] = g;
+        return next;
+      });
+    }
+    setLastLive(Object.fromEntries(live.filter((g) => g.kind === 'meeting').map((g) => [g.id, g])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
+  const cards = [
+    ...live.map((g) => ({ g, over: false })),
+    ...Object.values(ended)
+      .filter((g) => !live.some((l) => l.id === g.id))
+      .map((g) => ({ g, over: true })),
+  ].filter(({ g }) => !closed.has(g.id));
+  if (cards.length === 0) {
     return null;
   }
+  const close = (id: string) => setClosed((prev) => new Set(prev).add(id));
   return (
     <div className="absolute left-3 bottom-3 z-10 flex flex-col gap-2 w-80 max-w-[calc(100vw-1.5rem)]">
-      {game.world.gatherings.map((g) => (
-        <GatheringCard key={g.id} worldId={worldId} game={game} gathering={g} />
+      {cards.map(({ g, over }) => (
+        <GatheringCard
+          key={g.id}
+          worldId={worldId}
+          game={game}
+          gathering={g}
+          over={over}
+          onClose={() => close(g.id)}
+        />
       ))}
     </div>
   );
@@ -26,10 +61,14 @@ function GatheringCard({
   worldId,
   game,
   gathering,
+  over,
+  onClose,
 }: {
   worldId: Id<'worlds'>;
   game: ServerGame;
-  gathering: ServerGame['world']['gatherings'][number];
+  gathering: GatheringState;
+  over: boolean;
+  onClose: () => void;
 }) {
   const [open, setOpen] = useState(gathering.kind === 'meeting');
   const { focusOn } = useGodUi();
@@ -42,8 +81,9 @@ function GatheringCard({
     gathering.kind === 'meeting'
       ? `📣 Town meeting: ${gathering.topic}`
       : `👥 ${gathering.participants.map(nameOf).join(', ')}`;
-  const status =
-    gathering.status === 'gathering'
+  const status = over
+    ? 'The meeting is over.'
+    : gathering.status === 'gathering'
       ? 'Gathering…'
       : gathering.speaking
         ? `${nameOf(gathering.speaking)} is speaking…`
@@ -61,6 +101,9 @@ function GatheringCard({
         >
           Go
         </button>
+        <button className="text-xs bg-brown-900 px-2 py-0.5" title="Close" onClick={onClose}>
+          ✕
+        </button>
       </div>
       {open && (
         <div className="bg-brown-200 text-black text-xs max-h-52 overflow-y-auto p-2 flex flex-col gap-1">
@@ -72,7 +115,7 @@ function GatheringCard({
           {status && <p className="italic text-brown-700">{status}</p>}
         </div>
       )}
-      <HeroInGathering worldId={worldId} game={game} gathering={gathering} />
+      {!over && <HeroInGathering worldId={worldId} game={game} gathering={gathering} />}
     </div>
   );
 }

@@ -101,6 +101,8 @@ export const heroInputs = {
       const gathering = game.world.gatherings.find((g) => g.id === args.gatheringId);
       if (!gathering) return null;
       gathering.lastMessage = { author: args.playerId, timestamp: now };
+      // Give the others room to answer.
+      gathering.numMessages = Math.max(0, gathering.numMessages - 2);
       return null;
     },
   }),

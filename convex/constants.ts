@@ -90,15 +90,15 @@ export const MAX_PATHFINDS_PER_STEP = 16;
 
 export const DEFAULT_NAME = 'Me';
 
-// Day/night clock. Real milliseconds spent in each phase; a full day
-// is their sum (8 minutes by default). The clock only runs while the engine does.
-export const MORNING_DURATION = 90_000;
-export const DAY_DURATION = 180_000;
-export const EVENING_DURATION = 90_000;
-export const NIGHT_DURATION = 30_000;
+// Day/night clock. Real milliseconds spent in each phase: 8 minutes of
+// daylight (morning, day, evening) and a 1-minute night. The clock only runs while the engine does.
+export const MORNING_DURATION = 120_000;
+export const DAY_DURATION = 240_000;
+export const EVENING_DURATION = 120_000;
+export const NIGHT_DURATION = 60_000;
 
 // Agents stop starting new conversations for the last part of the evening.
-export const EVENING_WIND_DOWN = 45_000;
+export const EVENING_WIND_DOWN = 60_000;
 
 // Agents start walking to bed at the wind-down. If one hasn't arrived this long
 // after setting off, it sleeps where it stands.

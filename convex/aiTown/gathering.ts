@@ -118,10 +118,15 @@ export function tickGatherings(game: Game, now: number) {
       game.world.players.has(id as GameId<'players'>),
     );
     const max = gathering.kind === 'meeting' ? MEETING_MAX_MESSAGES : GROUP_MAX_MESSAGES;
+    // While the player is in it, a gathering doesn't run out of things to say:
+    // it waits for them, and ends at night or when they leave.
+    const humanHere = gathering.participants.some(
+      (id) => game.world.players.get(id as GameId<'players'>)?.human,
+    );
     if (
       gathering.participants.length < 2 ||
       isSleepTime(game.world) ||
-      (gathering.numMessages >= max && !gathering.speaking)
+      (gathering.numMessages >= max && !gathering.speaking && !humanHere)
     ) {
       end(game, gathering);
       continue;
