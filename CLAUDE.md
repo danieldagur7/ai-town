@@ -165,14 +165,6 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   join and speak in gatherings, and be a parent.
 - **Memory cost**: `rememberConversation` uses one JSON call for summary, importance and
   feeling change (was three).
-- **Statue project** (`convex/aiTown/project.ts`): `world.project` holds work done
-  out of `workNeeded` shifts and the material bill. God menu → Statue →
-  "Build a statue of me" (`startStatue` input) tops the stockpile up to the cost,
-  since gathering isn't simulated yet. Free agents in the morning/day walk to
-  `STATUE_SITE` with `WORK_CHANCE` (`tickWorker`, called from `Agent.tick`),
-  hammer for `WORK_SHIFT`, and each shift spends its share of wood/stone. Prompts
-  mention the project via `projectPrompt`. Stage art (`public/assets/projects/
-  statue_{0,1,2}.png`) is drawn by `src/components/Project.tsx`.
 - **Local pixel-art generation**: `scripts/generate_sprite.py` (SDXL-Turbo +
   pixel-art-xl LoRA on MPS, background keyed out, nearest-neighbour downscale).
   Run with the venv in `../imagegen`:
