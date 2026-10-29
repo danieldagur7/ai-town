@@ -1,5 +1,11 @@
 import { v } from 'convex/values';
-import { ActionCtx, internalAction, internalMutation, internalQuery } from '../_generated/server';
+import {
+  ActionCtx,
+  internalAction,
+  internalMutation,
+  internalQuery,
+  query,
+} from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { api, internal } from '../_generated/api';
 import { agentId, playerId } from '../aiTown/ids';
@@ -186,6 +192,14 @@ export const rememberGathering = internalAction({
       max_tokens: 150,
     });
     const description = `At ${what} with ${names.join(', ')}: ${content.trim()}`;
+    await ctx.runMutation(selfInternal.saveSummary, {
+      worldId: args.worldId,
+      gatheringId: args.gatheringId,
+      kind: args.kind,
+      topic: args.topic,
+      participants: names,
+      summary: content.trim(),
+    });
     const { embedding } = await fetchEmbedding(description);
     for (const p of args.participants) {
       if (!p.agentId) continue;
@@ -294,5 +308,38 @@ export const meetingContext = internalQuery({
       events.push(`The god punished ${p.name}: ${p.punishment ?? 'struck with lightning'}`);
     }
     return { alreadyMetToday: world.lastMeetingDay === day, townspeople, events };
+  },
+});
+
+export const saveSummary = internalMutation({
+  args: {
+    worldId: v.id('worlds'),
+    gatheringId: v.string(),
+    kind: v.union(v.literal('meeting'), v.literal('group')),
+    topic: v.string(),
+    participants: v.array(v.string()),
+    summary: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert('gatheringSummaries', args);
+  },
+});
+
+// Recent town meeting summaries, newest first, for the God menu.
+export const meetingSummaries = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }) => {
+    const rows = await ctx.db
+      .query('gatheringSummaries')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId).eq('kind', 'meeting'))
+      .order('desc')
+      .take(10);
+    return rows.map(({ _id, _creationTime, topic, participants, summary }) => ({
+      _id,
+      time: _creationTime,
+      topic,
+      participants,
+      summary,
+    }));
   },
 });

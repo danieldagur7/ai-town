@@ -52,6 +52,16 @@ export const godTables = {
     text: v.string(),
   }).index('decreeId', ['decreeId']),
 
+  // What was said and decided at each town meeting or group chat, for the God menu.
+  gatheringSummaries: defineTable({
+    worldId: v.id('worlds'),
+    gatheringId: v.string(),
+    kind: v.union(v.literal('meeting'), v.literal('group')),
+    topic: v.string(),
+    participants: v.array(v.string()),
+    summary: v.string(),
+  }).index('worldId', ['worldId', 'kind']),
+
   // Every time the god struck someone down.
   punishments: defineTable({
     worldId: v.id('worlds'),

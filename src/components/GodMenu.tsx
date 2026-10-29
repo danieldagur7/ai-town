@@ -60,6 +60,7 @@ function GodMenuPanel({
       <Manifest worldId={worldId} engineId={engineId} />
       <PrayerInbox worldId={worldId} />
       <Decrees worldId={worldId} engineId={engineId} />
+      <MeetingSummaries worldId={worldId} />
       <FaithScores worldId={worldId} />
       <section className="flex flex-col gap-2">
         <h3 className="text-xl">Time</h3>
@@ -486,6 +487,25 @@ function PrayerCard({
         </button>
       </div>
     </div>
+  );
+}
+
+function MeetingSummaries({ worldId }: { worldId: Id<'worlds'> }) {
+  const meetings = useQuery(api.agent.gathering.meetingSummaries, { worldId });
+  if (!meetings || meetings.length === 0) {
+    return null;
+  }
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xl">Town meetings</h3>
+      {meetings.map((m, i) => (
+        <details key={m._id} open={i === 0} className="bg-brown-200 text-black p-2 text-sm">
+          <summary className="cursor-pointer font-bold">📣 {m.topic}</summary>
+          <p className="leading-snug mt-1">{m.summary}</p>
+          <p className="text-xs text-brown-700 mt-1">With {m.participants.join(', ')}</p>
+        </details>
+      ))}
+    </section>
   );
 }
 
