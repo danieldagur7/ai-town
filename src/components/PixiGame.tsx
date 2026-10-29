@@ -16,6 +16,7 @@ import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { Beds } from './Beds.tsx';
+import { ProjectSite } from './Project.tsx';
 import { Smite, SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
 import { GOD_CHARACTER } from '../../data/characters.ts';
 
@@ -134,6 +135,9 @@ export const PixiGame = (props: {
         onpointerdown={onMapPointerDown}
       />
       <Beds tileDim={tileDim} />
+      {props.game.world.project && (
+        <ProjectSite project={props.game.world.project} tileDim={tileDim} />
+      )}
       {god && props.speechRadius !== null && (
         <SpeechRadius
           x={god.position.x}

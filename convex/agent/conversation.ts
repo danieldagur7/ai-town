@@ -12,6 +12,7 @@ import { faithDescription } from '../god/faith';
 import { GOD_CHARACTER } from '../../data/characters';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
 import { punishmentPrompt } from '../god/punishment';
+import { projectPrompt } from '../aiTown/project';
 import { getRelationship, relationshipPrompt } from './relationships';
 
 const selfInternal = internal.agent.conversation;
@@ -407,9 +408,10 @@ export const queryPromptData = internalQuery({
       args.otherPlayerId,
     );
     const clock = world.clock && clockState(world.clock.elapsed);
-    const timeOfDay = clock
-      ? `It's ${clock.phase} (${formatClock(clock)}) on day ${clock.day}.`
-      : `It's daytime.`;
+    const timeOfDay =
+      (clock
+        ? `It's ${clock.phase} (${formatClock(clock)}) on day ${clock.day}.`
+        : `It's daytime.`) + projectPrompt(world.project);
     return {
       player: { name: playerDescription.name, ...player },
       otherPlayer: {

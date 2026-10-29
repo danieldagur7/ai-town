@@ -133,3 +133,21 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   (Pixi stage + details pop-up), `PixiGame.tsx` / `PixiStaticMap.tsx` / `Player.tsx` /
   `Character.tsx` (rendering), `PlayerDetails.tsx` / `Messages.tsx` (chat).
   Messages live in the regular `messages` table, outside the engine.
+- **Statue project** (`convex/aiTown/project.ts`): `world.project` holds work done
+  out of `workNeeded` shifts and the material bill. God menu → Statue →
+  "Build a statue of me" (`startStatue` input) tops the stockpile up to the cost,
+  since gathering isn't simulated yet. Free agents in the morning/day walk to
+  `STATUE_SITE` with `WORK_CHANCE` (`tickWorker`, called from `Agent.tick`),
+  hammer for `WORK_SHIFT`, and each shift spends its share of wood/stone. Prompts
+  mention the project via `projectPrompt`. Stage art (`public/assets/projects/
+  statue_{0,1,2}.png`) is drawn by `src/components/Project.tsx`.
+- **Local pixel-art generation**: `scripts/generate_sprite.py` (SDXL-Turbo +
+  pixel-art-xl LoRA on MPS, background keyed out, nearest-neighbour downscale).
+  Run with the venv in `../imagegen`:
+  `HF_HUB_OFFLINE=1 ../imagegen/.venv/bin/python scripts/generate_sprite.py "<subject>" out.png --size 96 --seed 1`
+  (about 45 s per image including model load; try a few seeds).
+- **Auto-answer prayers** (`autoAnswerPrayers` in `convex/god/prayers.ts`): the
+  model judges each pending prayer against active decrees (helps a decree →
+  accept, works against one → decline, otherwise kindness) and answers it with
+  a short message; `autoReason` records why. "Auto-answer new prayers" in the
+  inbox (`godSettings` table) runs it as each prayer is written.

@@ -9,6 +9,8 @@ import {
   GOD_SPEECH_MAX_RADIUS,
   PUNISH_STUN_DURATION,
   PUNISH_WITNESS_RADIUS,
+  STATUE_COST,
+  STATUE_WORK_NEEDED,
 } from '../constants';
 import { parseGameId, playerId } from './ids';
 
@@ -38,6 +40,46 @@ export const godModeInputs = {
         if (value !== undefined) r[key] = Math.max(0, Math.round(value));
       }
       return r;
+    },
+  }),
+  // Start the statue on the plaza. Gathering isn't simulated yet, so the town
+  // is assumed to have collected the materials: the stockpile is topped up.
+  startStatue: inputHandler({
+    args: { name: v.optional(v.string()) },
+    handler: (game, _now, args) => {
+      if (game.world.project && game.world.project.finishedDay === undefined) {
+        throw new Error('The town is already building something');
+      }
+      game.world.resources.wood = Math.max(game.world.resources.wood, STATUE_COST.wood);
+      game.world.resources.stone = Math.max(game.world.resources.stone, STATUE_COST.stone);
+      game.world.project = {
+        kind: 'statue',
+        name: args.name?.trim() || 'a statue of the god',
+        work: 0,
+        workNeeded: STATUE_WORK_NEEDED,
+        cost: { ...STATUE_COST },
+        startedDay: game.world.clock ? clockState(game.world.clock.elapsed).day : 0,
+      };
+      game.scheduleOperation('considerTownMeeting', {
+        worldId: game.worldId,
+        reason: `The town has started building ${game.world.project.name} on the plaza.`,
+      });
+      return null;
+    },
+  }),
+  // Debug: add (or remove) work on the project, e.g. to see the later stages.
+  addProjectWork: inputHandler({
+    args: { shifts: v.number() },
+    handler: (game, _now, args) => {
+      const project = game.world.project;
+      if (!project) throw new Error('No project');
+      project.work = Math.min(project.workNeeded, Math.max(0, project.work + args.shifts));
+      if (project.work >= project.workNeeded) {
+        project.finishedDay ??= game.world.clock ? clockState(game.world.clock.elapsed).day : 0;
+      } else {
+        delete project.finishedDay;
+      }
+      return null;
     },
   }),
   // The manifested god speaks: everyone within `radius` tiles sees and hears it.

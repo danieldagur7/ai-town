@@ -12,6 +12,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useServerGame } from '../hooks/serverGame';
 import { useGodUi } from '../godUi';
 import { GOD_CHARACTER } from '../../data/characters';
+import { BUILDING as BUILDING_ACTIVITY } from '../../convex/aiTown/project';
 import { GOD_SPEECH_DEFAULT_RADIUS, GOD_SPEECH_MAX_RADIUS } from '../../convex/constants';
 
 // The god's toolbox: a pop-up menu that collects the god-mode features.
@@ -60,6 +61,7 @@ function GodMenuPanel({
       <Manifest worldId={worldId} engineId={engineId} />
       <PrayerInbox worldId={worldId} />
       <Decrees worldId={worldId} engineId={engineId} />
+      <Statue worldId={worldId} engineId={engineId} />
       <MeetingSummaries worldId={worldId} />
       <FaithScores worldId={worldId} />
       <TownDebug engineId={engineId} />
@@ -390,11 +392,28 @@ function Punish({
 function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
   const inbox = useQuery(api.god.prayers.prayerInbox, { worldId });
   const summarizePrayers = useAction(api.god.prayers.summarizePrayers);
+  const autoAnswer = useAction(api.god.prayers.autoAnswerPrayers);
+  const settings = useQuery(api.god.prayers.godSettings, { worldId });
+  const setAutoAnswer = useMutation(api.god.prayers.setAutoAnswer);
   const [summarizing, setSummarizing] = useState(false);
+  const [deciding, setDeciding] = useState(false);
   if (!inbox) {
     return null;
   }
   const unsummarized = inbox.pending.filter((p) => !p.summary).length;
+  const decideAll = async () => {
+    setDeciding(true);
+    try {
+      const results = await toastOnError(autoAnswer({ worldId }));
+      for (const r of results) {
+        toast(`${r.accept ? '✅ Granted' : '❌ Declined'} ${r.name}: ${r.reason}`, {
+          autoClose: 6000,
+        });
+      }
+    } finally {
+      setDeciding(false);
+    }
+  };
   const summarize = async () => {
     setSummarizing(true);
     try {
@@ -417,6 +436,31 @@ function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
           </button>
         )}
       </div>
+      <div className="flex items-center justify-between gap-2">
+        <label
+          className="text-sm flex items-center gap-2 cursor-pointer"
+          title="Each new prayer is judged against your decrees and answered as soon as it's written"
+        >
+          <input
+            type="checkbox"
+            checked={settings?.autoAnswerPrayers ?? false}
+            onChange={(e) =>
+              void toastOnError(setAutoAnswer({ worldId, enabled: e.target.checked }))
+            }
+          />
+          Auto-answer new prayers
+        </label>
+        {inbox.pending.length > 0 && (
+          <button
+            className="bg-clay-700 text-white text-sm px-2 py-1 disabled:opacity-50"
+            title="Let your will (the decrees) decide every waiting prayer"
+            disabled={deciding}
+            onClick={() => void decideAll()}
+          >
+            {deciding ? 'Deciding…' : 'Decide all for me'}
+          </button>
+        )}
+      </div>
       {inbox.praying.length > 0 && (
         <p className="text-sm text-brown-300">Praying now: {inbox.praying.join(', ')}…</p>
       )}
@@ -426,18 +470,49 @@ function PrayerInbox({ worldId }: { worldId: Id<'worlds'> }) {
         </p>
       )}
       {inbox.pending.map((prayer) => (
-        <PrayerCard key={prayer._id} prayer={prayer} />
+        <PrayerCard key={prayer._id} prayer={prayer} worldId={worldId} />
       ))}
+      {inbox.autoAnswered.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer text-brown-300">Decided for you</summary>
+          <ul className="flex flex-col gap-1 mt-1">
+            {inbox.autoAnswered.map((p) => (
+              <li key={p._id} className="bg-brown-900 p-2 leading-snug">
+                {p.accepted ? '✅' : '❌'} <b>{p.name}</b> (night {p.night}): {p.reason}
+                {p.message && <i className="block text-brown-300">"{p.message}"</i>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   );
 }
 
 function PrayerCard({
   prayer,
+  worldId,
 }: {
   prayer: { _id: Id<'prayers'>; name: string; night: number; text?: string; summary?: string };
+  worldId: Id<'worlds'>;
 }) {
   const answerPrayer = useMutation(api.god.prayers.answerPrayer);
+  const autoAnswer = useAction(api.god.prayers.autoAnswerPrayers);
+  const decide = async () => {
+    setSending(true);
+    try {
+      const [r] = await toastOnError(autoAnswer({ worldId, prayerId: prayer._id }));
+      if (r) {
+        toast(`${r.accept ? '✅ Granted' : '❌ Declined'} ${r.name}: ${r.reason}`, {
+          autoClose: 6000,
+        });
+      } else {
+        toast.error("Couldn't decide; try again");
+      }
+    } finally {
+      setSending(false);
+    }
+  };
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const answer = async (accept: boolean) => {
@@ -487,6 +562,14 @@ function PrayerCard({
           Decline
         </button>
       </div>
+      <button
+        className="bg-brown-700 text-white text-sm py-1 disabled:opacity-50"
+        title="Judge it against your decrees and answer it for you"
+        disabled={sending}
+        onClick={() => void decide()}
+      >
+        ✨ Decide for me
+      </button>
     </div>
   );
 }
@@ -527,6 +610,73 @@ function TownDebug({ engineId }: { engineId: Id<'engines'> }) {
       <button className="bg-clay-700 text-white text-sm py-1" onClick={apply}>
         Set stockpile
       </button>
+    </section>
+  );
+}
+
+// The town's building project: start the statue, watch it go up.
+function Statue({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'engines'> }) {
+  const game = useServerGame(worldId);
+  const startStatue = useSendInput(engineId, 'startStatue');
+  const addWork = useSendInput(engineId, 'addProjectWork');
+  const project = game?.world.project;
+  const working = game
+    ? [...game.world.players.values()]
+        .filter(
+          (p) => p.activity?.description === BUILDING_ACTIVITY && p.activity.until > Date.now(),
+        )
+        .map((p) => game.playerDescriptions.get(p.id)?.name)
+    : [];
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xl">Statue</h3>
+      {!project || project.finishedDay !== undefined ? (
+        <>
+          {project && (
+            <p className="text-sm text-brown-300">
+              🗿 {project.name} was finished on day {project.finishedDay}.
+            </p>
+          )}
+          <p className="text-sm text-brown-300">
+            The town has gathered the wood and stone; command them to build a statue on the plaza.
+            Townspeople work on it by day.
+          </p>
+          <button
+            className="bg-clay-700 text-white text-sm py-1"
+            onClick={() => void toastOnError(startStatue({}))}
+          >
+            Build a statue of me
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm">
+            🗿 {project.name}: {Math.floor((100 * project.work) / project.workNeeded)}%
+          </p>
+          <div className="h-3 bg-brown-900">
+            <div
+              className="h-3"
+              style={{
+                width: `${(100 * project.work) / project.workNeeded}%`,
+                background: '#f2c14e',
+              }}
+            />
+          </div>
+          <p className="text-xs text-brown-300">
+            {working.length > 0
+              ? `🔨 ${working.join(', ')} at work.`
+              : 'Nobody is working right now.'}{' '}
+            Started day {project.startedDay}.
+          </p>
+          <button
+            className="bg-brown-900 text-white text-xs py-1"
+            title="Debug: add 5 shifts of work"
+            onClick={() => void toastOnError(addWork({ shifts: 5 }))}
+          >
+            +5 shifts (debug)
+          </button>
+        </>
+      )}
     </section>
   );
 }

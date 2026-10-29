@@ -28,6 +28,7 @@ import { playerGathering, tickGatheringMember } from './gathering';
 import { Player } from './player';
 import { BED_WALK_TIMEOUT } from '../constants';
 import { GOD_CHARACTER } from '../../data/characters';
+import { tickWorker } from './project';
 
 const SLEEPING = 'sleeping';
 
@@ -44,6 +45,9 @@ export class Agent {
   };
   // Set when the agent starts heading to bed, cleared on waking.
   bedtimeStarted?: number;
+  // Working on the town's project: walking to the site, or mid-shift.
+  working?: { walking: true } | { shiftStarted: number };
+  lastWorked?: number;
 
   constructor(serialized: SerializedAgent) {
     const { id, lastConversation, lastInviteAttempt, inProgressOperation, bedtimeStarted } =
@@ -59,6 +63,8 @@ export class Agent {
     this.lastInviteAttempt = lastInviteAttempt;
     this.inProgressOperation = inProgressOperation;
     this.bedtimeStarted = bedtimeStarted;
+    this.working = serialized.working;
+    this.lastWorked = serialized.lastWorked;
   }
 
   tick(game: Game, now: number) {
@@ -124,6 +130,10 @@ export class Agent {
     // If we aren't doing an activity or moving, do something.
     // If we have been wandering but haven't thought about something to do for
     // a while, do something.
+    // Free time by day: maybe go work on the town's project instead.
+    if (!conversation && !doingActivity && tickWorker(game, now, this, player)) {
+      return;
+    }
     if (!conversation && !doingActivity && (!player.pathfinding || !recentlyAttemptedInvite)) {
       this.startOperation(game, now, 'agentDoSomething', {
         worldId: game.worldId,
@@ -346,6 +356,8 @@ export class Agent {
       console.log(`Agent ${this.id} heading to bed`);
       this.bedtimeStarted = now;
       delete player.activity;
+      // Down tools; an unfinished shift doesn't count.
+      delete this.working;
     }
     const bed = bedFor(game, player.id);
     if (!bed || distance(player.position, bed) < 0.1) {
@@ -392,6 +404,8 @@ export class Agent {
       lastInviteAttempt: this.lastInviteAttempt,
       inProgressOperation: this.inProgressOperation,
       bedtimeStarted: this.bedtimeStarted,
+      working: this.working,
+      lastWorked: this.lastWorked,
     };
   }
 }
@@ -410,6 +424,10 @@ export const serializedAgent = {
     }),
   ),
   bedtimeStarted: v.optional(v.number()),
+  working: v.optional(
+    v.union(v.object({ walking: v.literal(true) }), v.object({ shiftStarted: v.number() })),
+  ),
+  lastWorked: v.optional(v.number()),
 };
 export type SerializedAgent = ObjectType<typeof serializedAgent>;
 

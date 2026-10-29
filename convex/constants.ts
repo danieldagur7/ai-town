@@ -157,3 +157,13 @@ export const CRUSH_CHANCE = 0.1;
 export const MUTUAL_CRUSH_CHANCE = 0.6;
 // How far one conversation can move affinity either way.
 export const MAX_AFFINITY_CHANGE = 10;
+
+// Building projects (the statue). Free agents in the morning and day go to work
+// with WORK_CHANCE each time they decide what to do, and rest WORK_REST between
+// shifts. A shift is WORK_SHIFT of hammering; WORK_NEEDED full shifts finish the
+// statue (about two game days with five townspeople). Materials are used per shift.
+export const WORK_CHANCE = 0.5;
+export const WORK_REST = 30_000;
+export const WORK_SHIFT = 40_000;
+export const STATUE_WORK_NEEDED = 30;
+export const STATUE_COST = { wood: 30, stone: 60 };

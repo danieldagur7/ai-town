@@ -14,6 +14,7 @@ import { insertInput } from '../aiTown/insertInput';
 import { clockState, formatClock } from '../aiTown/clock';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
 import { punishmentPrompt } from '../god/punishment';
+import { projectPrompt } from '../aiTown/project';
 import { faithDescription } from '../god/faith';
 import { cleanMessage } from './conversation';
 import { MESSAGE_MAX_TOKENS } from '../constants';
@@ -126,7 +127,7 @@ export const gatheringPromptData = internalQuery({
       transcript,
       decrees: (await activeDecrees(ctx.db, args.worldId)).map((d) => d.text),
       punishments: await punishmentPrompt(ctx.db, args.worldId, args.playerId),
-      timeOfDay: clock ? `It's ${clock.phase} (${formatClock(clock)}).` : '',
+      timeOfDay: (clock ? `It's ${clock.phase} (${formatClock(clock)}).` : '') + projectPrompt(world.project),
     };
   },
 });

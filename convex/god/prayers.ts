@@ -6,10 +6,11 @@ import {
   internalMutation,
   internalQuery,
   mutation,
+  MutationCtx,
   query,
 } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
-import { internal } from '../_generated/api';
+import { api, internal } from '../_generated/api';
 import { agentId, playerId } from '../aiTown/ids';
 import { chatCompletion, fetchEmbedding } from '../util/llm';
 import { adjustFaith, faithDescription } from './faith';
@@ -106,6 +107,20 @@ export const finishPrayer = internalMutation({
   args: { prayerId: v.id('prayers'), text: v.optional(v.string()) },
   handler: async (ctx, { prayerId, text }) => {
     await ctx.db.patch(prayerId, text ? { status: 'pending', text } : { status: 'skipped' });
+    const prayer = await ctx.db.get(prayerId);
+    const settings =
+      text &&
+      prayer &&
+      (await ctx.db
+        .query('godSettings')
+        .withIndex('worldId', (q) => q.eq('worldId', prayer.worldId))
+        .first());
+    if (settings && settings.autoAnswerPrayers) {
+      await ctx.scheduler.runAfter(0, api.god.prayers.autoAnswerPrayers, {
+        worldId: prayer!.worldId,
+        prayerId,
+      });
+    }
   },
 });
 
@@ -231,19 +246,151 @@ export const answerPrayer = mutation({
     if (prayer.status !== 'pending') {
       throw new ConvexError(`This prayer was already ${prayer.status}`);
     }
-    const godResponse = args.message?.trim() || undefined;
-    await ctx.db.patch(prayer._id, {
-      status: args.accept ? 'accepted' : 'declined',
-      godResponse,
-      answered: Date.now(),
-    });
-    await adjustFaith(
-      ctx.db,
-      prayer.worldId,
-      prayer.playerId,
-      args.accept ? FAITH_ANSWERED : FAITH_IGNORED,
-    );
-    await ctx.scheduler.runAfter(0, selfInternal.rememberAnswer, { prayerId: prayer._id });
+    await applyAnswer(ctx, prayer, args.accept, args.message);
+  },
+});
+
+async function applyAnswer(
+  ctx: MutationCtx,
+  prayer: Doc<'prayers'>,
+  accept: boolean,
+  message?: string,
+  autoReason?: string,
+) {
+  await ctx.db.patch(prayer._id, {
+    status: accept ? 'accepted' : 'declined',
+    godResponse: message?.trim() || undefined,
+    answered: Date.now(),
+    autoReason,
+  });
+  await adjustFaith(
+    ctx.db,
+    prayer.worldId,
+    prayer.playerId,
+    accept ? FAITH_ANSWERED : FAITH_IGNORED,
+  );
+  await ctx.scheduler.runAfter(0, selfInternal.rememberAnswer, { prayerId: prayer._id });
+}
+
+// "Decide for me": the model judges each pending prayer (or just one) the way
+// the god would. Active decrees are the god's will, so a prayer asking for help
+// with one is granted and one working against it is refused; otherwise it
+// weighs whether granting it is good for the person and the town.
+export const autoAnswerPrayers = action({
+  args: { worldId: v.id('worlds'), prayerId: v.optional(v.id('prayers')) },
+  handler: async (ctx, args): Promise<{ name: string; accept: boolean; reason: string }[]> => {
+    const data = await ctx.runQuery(selfInternal.autoAnswerData, args);
+    const results = [];
+    for (const prayer of data.prayers) {
+      const decision = await judgePrayer(prayer, data.decrees);
+      if (!decision) continue;
+      const applied = await ctx.runMutation(selfInternal.applyAutoAnswer, {
+        prayerId: prayer._id,
+        ...decision,
+      });
+      if (applied)
+        results.push({ name: prayer.name, accept: decision.accept, reason: decision.reason });
+    }
+    return results;
+  },
+});
+
+async function judgePrayer(prayer: Doc<'prayers'>, decrees: string[]) {
+  const prompt = [
+    'You are deciding, on behalf of the god who watches over a small town, whether to grant ' +
+      'a prayer.',
+    decrees.length > 0
+      ? "The god's active decrees, which are its will:\n" +
+        decrees.map((d) => ` - "${d}"`).join('\n')
+      : 'The god has made no decrees.',
+    `${prayer.name} prayed: "${prayer.text}"`,
+    'Rules: if the prayer asks for help with or supports a decree, ACCEPT. If it asks for ' +
+      'something that goes against a decree, DECLINE. Otherwise ACCEPT if granting it is kind and ' +
+      'good for them and the town, and DECLINE if it is selfish, harmful or petty.',
+    'Reply in exactly this format, three lines:',
+    'DECISION: ACCEPT or DECLINE',
+    'REASON: <under 15 words, mention the decree if one decided it>',
+    'MESSAGE: <one short sentence the god says to them, warm if accepted, firm if declined>',
+  ];
+  const { content } = await chatCompletion({
+    messages: [{ role: 'user', content: prompt.join('\n') }],
+    max_tokens: 90,
+  });
+  const decision = content.match(/DECISION:\s*\**\s*(ACCEPT|DECLINE)/i);
+  if (!decision) {
+    console.error(`Couldn't read auto-answer for ${prayer.name}: ${content}`);
+    return null;
+  }
+  const line = (key: string) =>
+    content
+      .match(new RegExp(`${key}:\\s*(.+)`, 'i'))?.[1]
+      .replace(/^[*"“\s]+|[*"”\s]+$/g, '')
+      .trim() ?? '';
+  return {
+    accept: decision[1].toUpperCase() === 'ACCEPT',
+    reason: line('REASON'),
+    message: line('MESSAGE'),
+  };
+}
+
+export const autoAnswerData = internalQuery({
+  args: { worldId: v.id('worlds'), prayerId: v.optional(v.id('prayers')) },
+  handler: async (ctx, args) => {
+    let prayers = await ctx.db
+      .query('prayers')
+      .withIndex('status', (q) => q.eq('worldId', args.worldId).eq('status', 'pending'))
+      .collect();
+    if (args.prayerId) prayers = prayers.filter((p) => p._id === args.prayerId);
+    return {
+      prayers: prayers.filter((p) => p.text),
+      decrees: (await activeDecrees(ctx.db, args.worldId)).map((d) => d.text),
+    };
+  },
+});
+
+export const applyAutoAnswer = internalMutation({
+  args: {
+    prayerId: v.id('prayers'),
+    accept: v.boolean(),
+    reason: v.string(),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const prayer = await ctx.db.get(args.prayerId);
+    // The god may have answered it by hand meanwhile.
+    if (!prayer || prayer.status !== 'pending') return false;
+    await applyAnswer(ctx, prayer, args.accept, args.message, args.reason || 'decided for you');
+    return true;
+  },
+});
+
+export const godSettings = query({
+  args: { worldId: v.id('worlds') },
+  handler: async (ctx, { worldId }) => {
+    const row = await ctx.db
+      .query('godSettings')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId))
+      .first();
+    return { autoAnswerPrayers: row?.autoAnswerPrayers ?? false };
+  },
+});
+
+export const setAutoAnswer = mutation({
+  args: { worldId: v.id('worlds'), enabled: v.boolean() },
+  handler: async (ctx, { worldId, enabled }) => {
+    const row = await ctx.db
+      .query('godSettings')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId))
+      .first();
+    if (row) {
+      await ctx.db.patch(row._id, { autoAnswerPrayers: enabled });
+    } else {
+      await ctx.db.insert('godSettings', { worldId, autoAnswerPrayers: enabled });
+    }
+    if (enabled) {
+      // Clear what's already waiting.
+      await ctx.scheduler.runAfter(0, api.god.prayers.autoAnswerPrayers, { worldId });
+    }
   },
 });
 
@@ -304,6 +451,15 @@ export const prayerInbox = query({
         .withIndex('status', (q) => q.eq('worldId', worldId).eq('status', 'queued'))
         .collect()),
     ];
+    const recentAuto = (
+      await ctx.db
+        .query('prayers')
+        .withIndex('worldId_answered', (q) => q.eq('worldId', worldId))
+        .order('desc')
+        .take(20)
+    )
+      .filter((p) => p.autoReason)
+      .slice(0, 5);
     return {
       pending: pending.map(({ _id, name, night, text, summary }) => ({
         _id,
@@ -313,6 +469,15 @@ export const prayerInbox = query({
         summary,
       })),
       praying: inProgress.map((p) => p.name),
+      // The last few decided by auto-answer, so the god can see what it did.
+      autoAnswered: recentAuto.map(({ _id, name, night, status, autoReason, godResponse }) => ({
+        _id,
+        name,
+        night,
+        accepted: status === 'accepted',
+        reason: autoReason!,
+        message: godResponse,
+      })),
     };
   },
 });

@@ -29,9 +29,12 @@ export const godTables = {
     generationStarted: v.optional(v.number()),
     godResponse: v.optional(v.string()),
     answered: v.optional(v.number()),
+    // Set when the auto-answer decided: why it accepted or declined.
+    autoReason: v.optional(v.string()),
   })
     .index('player_night', ['worldId', 'playerId', 'night'])
-    .index('status', ['worldId', 'status']),
+    .index('status', ['worldId', 'status'])
+    .index('worldId_answered', ['worldId', 'answered']),
 
   // The god's mission statements for the town. Active ones go into every
   // character's prompts.
@@ -75,6 +78,13 @@ export const godTables = {
   }).index('worldId', ['worldId']),
 
   // Created the first time the god answers one of a character's prayers.
+  // Per-world god settings.
+  godSettings: defineTable({
+    worldId: v.id('worlds'),
+    // Answer each new prayer automatically as soon as it's written.
+    autoAnswerPrayers: v.boolean(),
+  }).index('worldId', ['worldId']),
+
   faith: defineTable({
     worldId: v.id('worlds'),
     playerId,
