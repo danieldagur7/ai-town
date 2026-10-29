@@ -5,6 +5,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import closeImg from '../../assets/close.svg';
 import { SelectElement } from './Player';
 import { Messages } from './Messages';
+import { Mind } from './Mind';
 import { toastOnError } from '../toasts';
 import { useSendInput } from '../hooks/sendInput';
 import { Player } from '../../convex/aiTown/player';
@@ -252,6 +253,7 @@ export default function PlayerDetails({
           scrollViewRef={scrollViewRef}
         />
       )}
+      {!isMe && !player.human && <Mind worldId={worldId} playerId={player.id} />}
       {!playerConversation && previousConversation && (
         <>
           <div className="box flex-grow">

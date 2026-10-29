@@ -148,3 +148,12 @@ export const GROUP_CHANCE = 0.35;
 
 // Town resources: what the town starts with.
 export const START_RESOURCES = { wood: 0, stone: 0, food: 20 };
+
+// Relationships between characters: affinity runs -100 (enemy) to 100 (close
+// friend). New pairs start somewhere in +-STARTING_AFFINITY. Each character has
+// a CRUSH_CHANCE of a crush on someone, mutual with MUTUAL_CRUSH_CHANCE.
+export const STARTING_AFFINITY = 40;
+export const CRUSH_CHANCE = 0.1;
+export const MUTUAL_CRUSH_CHANCE = 0.6;
+// How far one conversation can move affinity either way.
+export const MAX_AFFINITY_CHANGE = 10;

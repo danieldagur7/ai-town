@@ -98,6 +98,8 @@ export function tickGatherings(game: Game, now: number) {
   if (clock && clock.phase === 'day' && game.world.lastMeetingCheckDay !== clock.day) {
     game.world.lastMeetingCheckDay = clock.day;
     game.scheduleOperation('considerTownMeeting', { worldId: game.worldId });
+    // Make sure every pair of townspeople has a relationship (new characters, resets).
+    game.scheduleOperation('seedRelationships', { worldId: game.worldId });
   }
   for (const gathering of [...game.world.gatherings]) {
     // Drop anyone who has left the world.

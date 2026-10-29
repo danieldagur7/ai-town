@@ -92,6 +92,11 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
     `summarizeDecreeTalk` keyword-filters the speaker's lines and asks the LLM what
     they said about each decree, saving it to `decreeOpinions` for the God menu.
     There is no LLM planning step yet; Stage 5d adds one and should reuse the same helper.
+- **Relationships** (`convex/agent/relationships.ts`): one row per direction, affinity
+  -100..100 plus a `crush` flag (`CRUSH_CHANCE`, mutual with `MUTUAL_CRUSH_CHANCE`). Seeded
+  by `seedRelationships` (idempotent, also run daily). Each remembered conversation asks
+  the LLM for a -10..10 shift. `relationshipPrompt` adds how they feel to conversation
+  prompts; `characterMind` feeds the "On their mind" panel (`src/components/Mind.tsx`).
 - **Gatherings** (`convex/aiTown/gathering.ts` engine side, `convex/agent/gathering.ts`
   LLM side): group chats (started from `agentDoSomething` when 2+ free characters are
   near, `GROUP_CHANCE`) and town meetings on the plaza (called by an agent via

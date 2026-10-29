@@ -433,6 +433,9 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
     case 'rememberGathering':
       reference = internal.agent.gathering.rememberGathering;
       break;
+    case 'seedRelationships':
+      reference = internal.agent.relationships.seedRelationships;
+      break;
     case 'considerTownMeeting':
       reference = internal.agent.gathering.considerTownMeeting;
       break;

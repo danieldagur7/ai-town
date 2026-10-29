@@ -97,6 +97,29 @@ export async function rememberConversation(
     otherName: otherPlayer.name,
     transcript,
   });
+  // How did this conversation change how they feel about the other person?
+  const { content: moodRaw } = await chatCompletion({
+    messages: [
+      {
+        role: 'user',
+        content:
+          `${player.name} just had this conversation with ${otherPlayer.name}: ${content}\n` +
+          `On a scale from -10 (it made ${player.name} like them much less) to 10 (much more), ` +
+          `how did it change ${player.name}'s feelings about ${otherPlayer.name}? Reply with the number only.`,
+      },
+    ],
+    temperature: 0.0,
+    max_tokens: 3,
+  });
+  const delta = parseInt(moodRaw.match(/-?\d+/)?.[0] ?? '0', 10);
+  if (!isNaN(delta) && delta !== 0) {
+    await ctx.runMutation(internal.agent.relationships.adjustAffinity, {
+      worldId,
+      from: player.id,
+      to: otherPlayer.id,
+      delta,
+    });
+  }
   await reflectOnMemories(ctx, worldId, playerId);
   return description;
 }

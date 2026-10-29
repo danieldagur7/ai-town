@@ -65,6 +65,14 @@ export const memoryTables = {
 
 export const agentTables = {
   ...memoryTables,
+  // How `playerId` feels about `otherId` (one row per direction).
+  relationships: defineTable({
+    worldId: v.id('worlds'),
+    playerId,
+    otherId: playerId,
+    affinity: v.number(),
+    crush: v.boolean(),
+  }).index('pair', ['worldId', 'playerId', 'otherId']),
   embeddingsCache: defineTable({
     textHash: v.bytes(),
     embedding: v.array(v.float64()),
