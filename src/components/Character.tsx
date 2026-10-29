@@ -150,7 +150,7 @@ export const Character = ({
           ref={ref}
           isPlaying={isMoving}
           textures={spriteSheet.animations[direction]}
-          animationSpeed={speed * 1.4}
+          animationSpeed={speed * 2.5}
           anchor={{ x: 0.5, y: 1 }}
           y={16}
         />
@@ -187,7 +187,7 @@ const burst = (t: number, every: number, length: number, seed: number) => {
 const pose: Pose = { dx: 0, dy: 0, rot: 0, sx: 1, sy: 1 };
 
 function walkPose(t: number): Pose {
-  const step = Math.sin(t * 11);
+  const step = Math.sin(t * 16);
   pose.dx = 0;
   pose.dy = -Math.abs(step) * 1.5;
   pose.rot = step * 0.035;

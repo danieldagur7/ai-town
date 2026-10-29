@@ -142,5 +142,5 @@ export const divineCharacter = {
   speed: 0.1,
 };
 
-// Characters move at 0.75 tiles per second.
-export const movementSpeed = 0.75;
+// Characters move at 1.875 tiles per second.
+export const movementSpeed = 1.875;
