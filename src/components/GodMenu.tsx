@@ -281,14 +281,34 @@ function Punish({
 }) {
   const game = useServerGame(worldId);
   const punish = useSendInput(engineId, 'punish');
+  const suggestPunishments = useAction(api.god.punishment.suggestPunishments);
   const [target, setTarget] = useState('');
+  const [punishment, setPunishment] = useState('');
+  const [emoji, setEmoji] = useState('⚡');
   const [message, setMessage] = useState('');
+  const [suggestions, setSuggestions] = useState<{ emoji: string; text: string }[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
   const townspeople = game
     ? [...game.world.agents.values()].map((a) => ({
         id: a.playerId,
         name: game.playerDescriptions.get(a.playerId)?.name ?? a.playerId,
       }))
     : [];
+  const chooseTarget = async (playerId: string) => {
+    setTarget(playerId);
+    setSuggestions([]);
+    if (!playerId) {
+      return;
+    }
+    setSuggesting(true);
+    try {
+      setSuggestions(
+        await toastOnError(suggestPunishments({ worldId, playerId, decreeText: decree.text })),
+      );
+    } finally {
+      setSuggesting(false);
+    }
+  };
   const strike = async () => {
     const witnesses = await toastOnError(
       punish({
@@ -296,11 +316,15 @@ function Punish({
         decreeId: decree._id,
         decreeText: decree.text,
         message: message || undefined,
+        punishment: punishment || undefined,
+        emoji,
       }),
     );
     const name = townspeople.find((p) => p.id === target)?.name;
-    toast.success(`${name} was struck down${witnesses > 0 ? `; ${witnesses} saw it happen` : ''}.`);
+    toast.success(`${name} was punished${witnesses > 0 ? `; ${witnesses} saw it happen` : ''}.`);
     setMessage('');
+    setPunishment('');
+    setEmoji('⚡');
   };
   return (
     <div className="flex flex-col gap-1 border-t border-brown-700 pt-2">
@@ -308,7 +332,7 @@ function Punish({
       <select
         className="text-sm text-black bg-white p-1"
         value={target}
-        onChange={(e) => setTarget(e.target.value)}
+        onChange={(e) => void chooseTarget(e.target.value)}
       >
         <option value="">Choose who…</option>
         {townspeople.map((p) => (
@@ -317,18 +341,45 @@ function Punish({
           </option>
         ))}
       </select>
-      <input
-        className="text-sm text-black bg-white p-1"
-        placeholder="Optional words of thunder"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-      />
+      {suggesting && <p className="text-xs">Thinking of what would hurt most…</p>}
+      {suggestions.map((s) => (
+        <button
+          key={s.text}
+          className={
+            'text-left text-xs p-1 border ' +
+            (punishment === s.text ? 'bg-yellow-300 border-black' : 'bg-white border-brown-300')
+          }
+          onClick={() => {
+            setPunishment(s.text);
+            setEmoji(s.emoji);
+          }}
+        >
+          {s.emoji} {s.text}
+        </button>
+      ))}
+      {target && (
+        <>
+          <textarea
+            className="text-sm text-black bg-white p-1 resize-none"
+            rows={2}
+            placeholder="Or describe your own punishment (default: struck with lightning)"
+            value={punishment}
+            onChange={(e) => setPunishment(e.target.value)}
+          />
+          <input
+            className="text-sm text-black bg-white p-1"
+            placeholder="Optional words of thunder"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </>
+      )}
       <button
         className="bg-yellow-600 text-black text-sm py-1 font-bold disabled:opacity-50"
         disabled={!target}
         onClick={() => void strike()}
       >
-        ⚡ Strike with lightning
+        {emoji} Punish
       </button>
     </div>
   );

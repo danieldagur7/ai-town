@@ -14,6 +14,7 @@ import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
+import { GameId } from '../../convex/aiTown/ids.ts';
 import { Beds } from './Beds.tsx';
 import { Smite, SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
 import { GOD_CHARACTER } from '../../data/characters.ts';
@@ -27,6 +28,7 @@ export const PixiGame = (props: {
   height: number;
   setSelectedElement: SelectElement;
   speechRadius: number | null;
+  focus: { playerId: string; n: number } | null;
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
@@ -88,6 +90,23 @@ export const PixiGame = (props: {
   const god = players.find(
     (p) => p.human && props.game.playerDescriptions.get(p.id)?.character === GOD_CHARACTER,
   );
+
+  // Fly to a character picked from the People menu, and select them.
+  useEffect(() => {
+    const focus = props.focus;
+    if (!focus || !viewportRef.current) return;
+    const player = props.game.world.players.get(focus.playerId as GameId<'players'>);
+    if (!player) return;
+    viewportRef.current.animate({
+      position: new PIXI.Point(
+        // Aim a little right of them so the details pop-up doesn't cover them.
+        (player.position.x + 4.5) * tileDim,
+        (player.position.y + 0.5) * tileDim,
+      ),
+      scale: 1.5,
+    });
+    props.setSelectedElement({ kind: 'player', id: player.id });
+  }, [props.focus?.n]);
 
   // Zoom on the user’s avatar when it is created
   useEffect(() => {

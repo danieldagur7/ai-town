@@ -60,6 +60,8 @@ export const godTables = {
     decreeId: v.optional(v.id('decrees')),
     decreeText: v.optional(v.string()),
     message: v.optional(v.string()),
+    // What the god did to them, in the god's own words (default: lightning).
+    punishment: v.optional(v.string()),
   }).index('worldId', ['worldId']),
 
   // Created the first time the god answers one of a character's prayers.

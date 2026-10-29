@@ -14,6 +14,7 @@ import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
 import GodMenu from './components/GodMenu.tsx';
+import PeopleMenu from './components/PeopleMenu.tsx';
 import { GodUiProvider } from './godUi.tsx';
 import { MAX_HUMAN_PLAYERS } from '../convex/constants.ts';
 
@@ -85,6 +86,7 @@ export default function Home() {
           <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
             Help
           </Button>
+          <PeopleMenu />
           <GodMenu />
           <ClockBadge />
         </header>

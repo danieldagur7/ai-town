@@ -76,6 +76,8 @@ export const godModeInputs = {
       decreeId: v.optional(v.id('decrees')),
       decreeText: v.optional(v.string()),
       message: v.optional(v.string()),
+      punishment: v.optional(v.string()),
+      emoji: v.optional(v.string()),
     },
     handler: (game, now, args) => {
       const targetId = parseGameId('players', args.playerId);
@@ -86,9 +88,10 @@ export const godModeInputs = {
       }
       game.world.playerConversation(target)?.leave(game, now, target);
       stopPlayer(target);
+      const punishment = args.punishment?.trim() || 'struck with lightning';
       target.activity = {
-        description: 'struck by lightning',
-        emoji: '⚡',
+        description: punishment,
+        emoji: args.emoji?.trim() || '⚡',
         until: now + PUNISH_STUN_DURATION,
       };
       const witnesses = [];
@@ -112,6 +115,7 @@ export const godModeInputs = {
         decreeId: args.decreeId,
         decreeText: args.decreeText,
         message: args.message?.trim() || undefined,
+        punishment,
         witnesses,
       });
       return witnesses.length;

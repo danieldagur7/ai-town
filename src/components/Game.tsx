@@ -38,7 +38,7 @@ export default function Game() {
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
   // Pixi doesn't see React context, so pass the god UI state in as a prop.
-  const { speechRadius } = useGodUi();
+  const { speechRadius, focus } = useGodUi();
   const humanTokenIdentifier = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
 
   // PlayerDetails follows the human's conversation even with nothing selected,
@@ -83,6 +83,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     historicalTime={historicalTime}
                     setSelectedElement={setSelectedElement}
                     speechRadius={speechRadius}
+                    focus={focus}
                   />
                 </ConvexProvider>
               </Stage>
