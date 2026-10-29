@@ -95,7 +95,7 @@ export const DEFAULT_NAME = 'Me';
 export const MORNING_DURATION = 90_000;
 export const DAY_DURATION = 180_000;
 export const EVENING_DURATION = 90_000;
-export const NIGHT_DURATION = 120_000;
+export const NIGHT_DURATION = 30_000;
 
 // Agents stop starting new conversations for the last part of the evening.
 export const EVENING_WIND_DOWN = 45_000;
