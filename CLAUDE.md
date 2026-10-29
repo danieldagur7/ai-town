@@ -50,6 +50,12 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   `inputs[name].handler` (`convex/aiTown/inputs.ts` merges `player.ts`,
   `conversation.ts`, `agentInputs.ts`) → return value written back; the client waits
   on `aiTown/main:inputStatus`. Actions use `api.aiTown.main.sendInput`.
+- **Map** (`data/town.ts`): the original `data/gentle.js` map widened to 86×48 (16:9)
+  with an east village. Tile ids >= `MAGE_TILE_OFFSET` come from `magecity.png`
+  (rendered by `PixiStaticMap.tsx`); anything in `objmap` blocks walking. `PLAZA`,
+  `STATUE_SITE`, `HOUSES` and `FIELDS` are exported for game mechanics. New worlds use
+  it via `convex/init.ts`; an existing world is updated in place with
+  `testing:stop` → `townMap:applyTownMap` → `testing:resume`.
 - **Day/night** (`convex/aiTown/clock.ts`, always on): `world.clock.elapsed` advances in
   `Game.tick` (capped per tick, so stopped worlds don't skip ahead). Phases and
   durations are in `convex/constants.ts`; beds are in `data/beds.ts` (looked up by

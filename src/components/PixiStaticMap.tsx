@@ -6,6 +6,7 @@ import * as gentlesparkle from '../../data/animations/gentlesparkle.json';
 import * as gentlewaterfall from '../../data/animations/gentlewaterfall.json';
 import * as gentlesplash from '../../data/animations/gentlesplash.json';
 import * as windmill from '../../data/animations/windmill.json';
+import { MAGE_TILESET_COLUMNS, MAGE_TILESET_URL, MAGE_TILE_OFFSET } from '../../data/town';
 
 const animations = {
   'campfire.json': { spritesheet: campfire, url: '/ai-town/assets/spritesheets/campfire.png' },
@@ -18,8 +19,10 @@ const animations = {
     url: '/ai-town/assets/spritesheets/gentlewaterfall32.png',
   },
   'windmill.json': { spritesheet: windmill, url: '/ai-town/assets/spritesheets/windmill.png' },
-  'gentlesplash.json': { spritesheet: gentlesplash,
-    url: '/ai-town/assets/spritesheets/gentlewaterfall32.png',},
+  'gentlesplash.json': {
+    spritesheet: gentlesplash,
+    url: '/ai-town/assets/spritesheets/gentlewaterfall32.png',
+  },
 };
 
 export const PixiStaticMap = PixiComponent('StaticMap', {
@@ -40,6 +43,16 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
         );
       }
     }
+    // Village tiles from the second tileset (ids from MAGE_TILE_OFFSET up).
+    const mageBase = PIXI.BaseTexture.from(MAGE_TILESET_URL, {
+      scaleMode: PIXI.SCALE_MODES.NEAREST,
+    });
+    const mageTile = (index: number) => {
+      const i = index - MAGE_TILE_OFFSET;
+      const x = (i % MAGE_TILESET_COLUMNS) * map.tileDim;
+      const y = Math.floor(i / MAGE_TILESET_COLUMNS) * map.tileDim;
+      return new PIXI.Texture(mageBase, new PIXI.Rectangle(x, y, map.tileDim, map.tileDim));
+    };
     const screenxtiles = map.bgTiles[0].length;
     const screenytiles = map.bgTiles[0][0].length;
 
@@ -58,7 +71,9 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
         const tileIndex = layer[x][y];
         // Some layers may not have tiles at this location.
         if (tileIndex === -1) continue;
-        const ctile = new PIXI.Sprite(tiles[tileIndex]);
+        const ctile = new PIXI.Sprite(
+          tileIndex >= MAGE_TILE_OFFSET ? mageTile(tileIndex) : tiles[tileIndex],
+        );
         ctile.x = xPx;
         ctile.y = yPx;
         container.addChild(ctile);

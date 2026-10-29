@@ -17,9 +17,10 @@ export type ViewportProps = {
   children?: ReactNode;
 };
 
-// Zoomed all the way out, the whole map fits on screen.
+// Zoomed all the way out, the map fills the screen (no bars; on screens that
+// aren't 16:9 a little of one edge is off screen and can be panned to).
 function zoomLimits(props: ViewportProps) {
-  const fit = Math.min(
+  const fit = Math.max(
     props.screenWidth / props.worldWidth,
     props.screenHeight / props.worldHeight,
   );
