@@ -4,12 +4,12 @@
 
 @font-face {
   font-family: 'Upheaval Pro';
-  src: url(/assets/fonts/upheaval_pro.ttf);
+  src: url(/ai-town/assets/fonts/upheaval_pro.ttf);
 }
 
 @font-face {
   font-family: 'VCR OSD Mono';
-  src: url(/assets/fonts/vcr_osd_mono.ttf);
+  src: url(/ai-town/assets/fonts/vcr_osd_mono.ttf);
 }
 
 .font-display {
@@ -21,7 +21,8 @@
 }
 
 .font-system {
-  font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji',
+    'Segoe UI Emoji', 'Segoe UI Symbol';
 }
 
 :root {
@@ -186,4 +187,170 @@ p[contenteditable='true']:empty::before {
 
 .pixelated {
   image-rendering: pixelated;
+}
+
+/* Character creator: the feature wheel's preview acts out the chosen habit. */
+.look-stage {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 80%, rgba(24, 20, 37, 0.45) 0 22%, transparent 23%),
+    #3f2832;
+  border: 4px solid #181425;
+}
+.look-stage .look-preview {
+  transform: scale(1.8);
+  transform-origin: 50% 100%;
+}
+.look-stage.spinning .look-preview {
+  animation: wheel-spin 0.25s linear infinite;
+}
+.wheel-arrow {
+  background: #181425;
+  color: #e4a672;
+  width: 1.5rem;
+  line-height: 1.5rem;
+  font-size: 0.7rem;
+}
+.wheel-arrow:active {
+  transform: scale(0.9);
+}
+@keyframes wheel-spin {
+  50% {
+    transform: scale(0.1, 1.8);
+  }
+}
+.look-preview.quirk-bouncy > div {
+  animation: q-bouncy 3s infinite;
+}
+.look-preview.quirk-sway > div {
+  animation: q-sway 2.4s ease-in-out infinite;
+}
+.look-preview.quirk-fidget > div {
+  animation: q-fidget 2.4s infinite;
+}
+.look-preview.quirk-proud > div {
+  animation: q-proud 3s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.look-preview.quirk-ponder > div {
+  animation: q-ponder 4s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+.look-preview.quirk-grumble > div {
+  animation: q-grumble 3.5s infinite;
+  transform-origin: 50% 100%;
+}
+.look-preview.quirk-tap > div {
+  animation: q-tap 2.5s infinite;
+}
+.look-preview.quirk-wobble > div {
+  animation: q-sway 1.4s ease-in-out infinite;
+}
+.look-preview.quirk-twirl > div {
+  animation: q-twirl 4s infinite;
+}
+@keyframes q-bouncy {
+  0%,
+  80%,
+  100% {
+    transform: none;
+  }
+  88% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes q-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes q-fidget {
+  0%,
+  70%,
+  100% {
+    transform: none;
+  }
+  75%,
+  85%,
+  95% {
+    transform: translateX(-1px);
+  }
+  80%,
+  90% {
+    transform: translateX(1px);
+  }
+}
+@keyframes q-proud {
+  0%,
+  100% {
+    transform: scaleY(1.02);
+  }
+  50% {
+    transform: scaleY(1.07);
+  }
+}
+@keyframes q-ponder {
+  0%,
+  40%,
+  100% {
+    transform: none;
+  }
+  60%,
+  80% {
+    transform: rotate(7deg);
+  }
+}
+@keyframes q-grumble {
+  0%,
+  80%,
+  100% {
+    transform: none;
+  }
+  84%,
+  92% {
+    transform: rotate(-5deg);
+  }
+  88%,
+  96% {
+    transform: rotate(5deg);
+  }
+}
+@keyframes q-tap {
+  0%,
+  60%,
+  100% {
+    transform: none;
+  }
+  65%,
+  75%,
+  85% {
+    transform: translateY(-1px);
+  }
+  70%,
+  80%,
+  90% {
+    transform: none;
+  }
+}
+@keyframes q-twirl {
+  0%,
+  85%,
+  100% {
+    transform: none;
+  }
+  92% {
+    transform: scaleX(-1) translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .look-preview > div,
+  .look-stage.spinning .look-preview {
+    animation: none !important;
+  }
 }

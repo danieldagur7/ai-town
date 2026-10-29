@@ -1,11 +1,12 @@
 import * as PIXI from 'pixi.js';
 import { useApp } from '@pixi/react';
 import { Player, SelectElement } from './Player.tsx';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PixiStaticMap } from './PixiStaticMap.tsx';
 import PixiViewport from './PixiViewport.tsx';
 import { Viewport } from 'pixi-viewport';
-import { Id } from '../../convex/_generated/dataModel';
+import { Doc, Id } from '../../convex/_generated/dataModel';
+import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api.js';
 import { useSendInput } from '../hooks/sendInput.ts';
@@ -15,16 +16,20 @@ import { PositionIndicator } from './PositionIndicator.tsx';
 import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { GameId } from '../../convex/aiTown/ids.ts';
+import { Player as ServerPlayer } from '../../convex/aiTown/player.ts';
 import { Beds } from './Beds.tsx';
 import { EraHouses, ProjectSite, Structures } from './Project.tsx';
 import { Smite, SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
 import { GOD_CHARACTER } from '../../data/characters.ts';
+import { openMenu } from '../hooks/useMenu.ts';
+import { setSunHour } from '../sun.ts';
+import { clockState } from '../../convex/aiTown/clock.ts';
 
 export const PixiGame = (props: {
   worldId: Id<'worlds'>;
   engineId: Id<'engines'>;
   game: ServerGame;
-  historicalTime: number | undefined;
+  engineStatus: Doc<'engines'> | undefined;
   width: number;
   height: number;
   setSelectedElement: SelectElement;
@@ -33,7 +38,10 @@ export const PixiGame = (props: {
 }) => {
   // PIXI setup.
   const pixiApp = useApp();
+  // Lets the PixiJS devtools (and debugging from the console) find the scene.
+  if (import.meta.env.DEV) (globalThis as any).__PIXI_APP__ = pixiApp;
   const viewportRef = useRef<Viewport | undefined>();
+  if (props.game.world.clock) setSunHour(clockState(props.game.world.clock.elapsed).hour);
 
   const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
   const art = useQuery(api.art.artByKey, { worldId: props.worldId });
@@ -47,6 +55,8 @@ export const PixiGame = (props: {
   // Interaction for clicking on the world to navigate.
   const dragStart = useRef<{ screenX: number; screenY: number } | null>(null);
   const onMapPointerDown = (e: any) => {
+    // Touching the map puts away any open menu.
+    openMenu(null);
     // https://pixijs.download/dev/docs/PIXI.FederatedPointerEvent.html
     dragStart.current = { screenX: e.screenX, screenY: e.screenY };
   };
@@ -136,9 +146,9 @@ export const PixiGame = (props: {
         onpointerup={onMapPointerUp}
         onpointerdown={onMapPointerDown}
       />
-      <Beds tileDim={tileDim} />
       <EraHouses era={props.game.world.era} art={art} tileDim={tileDim} />
       <Structures structures={props.game.world.structures} art={art} tileDim={tileDim} />
+      <Beds game={props.game} tileDim={tileDim} />
       {props.game.world.project && (
         <ProjectSite project={props.game.world.project} tileDim={tileDim} />
       )}
@@ -162,18 +172,60 @@ export const PixiGame = (props: {
           ),
       )}
       {lastDestination && <PositionIndicator destination={lastDestination} tileDim={tileDim} />}
-      {players.map((p) => (
+      <Players
+        game={props.game}
+        players={players}
+        engineStatus={props.engineStatus}
+        humanPlayerId={humanPlayerId}
+        onClick={props.setSelectedElement}
+        effects={effects}
+      />
+    </PixiViewport>
+  );
+};
+
+// The people, drawn at the interpolated server time. The time changes every
+// frame, so it lives here: only this layer re-renders each frame, not the map,
+// buildings and beds.
+function Players(props: {
+  game: ServerGame;
+  players: ServerPlayer[];
+  engineStatus: Doc<'engines'> | undefined;
+  humanPlayerId: GameId<'players'> | undefined;
+  onClick: SelectElement;
+  effects: Record<string, string[]> | undefined;
+}) {
+  const { historicalTime } = useHistoricalTime(props.engineStatus);
+  // Who's talking or thinking only changes when the game state does, not every
+  // frame, so work it out once here rather than per person per frame.
+  const { speaking, thinking } = useMemo(() => {
+    const speaking = new Set<string>();
+    for (const c of props.game.world.conversations.values()) {
+      if (c.isTyping) speaking.add(c.isTyping.playerId);
+    }
+    for (const g of props.game.world.gatherings) if (g.speaking) speaking.add(g.speaking);
+    const thinking = new Set<string>();
+    for (const a of props.game.world.agents.values()) {
+      if (a.inProgressOperation && !speaking.has(a.playerId)) thinking.add(a.playerId);
+    }
+    return { speaking, thinking };
+  }, [props.game]);
+  return (
+    <>
+      {props.players.map((p) => (
         <Player
           key={`player-${p.id}`}
           game={props.game}
           player={p}
-          isViewer={p.id === humanPlayerId}
-          onClick={props.setSelectedElement}
-          historicalTime={props.historicalTime}
-          effects={effects?.[p.id]}
+          isViewer={p.id === props.humanPlayerId}
+          onClick={props.onClick}
+          historicalTime={historicalTime}
+          effects={props.effects?.[p.id]}
+          isSpeaking={speaking.has(p.id)}
+          isThinking={thinking.has(p.id)}
         />
       ))}
-    </PixiViewport>
+    </>
   );
-};
+}
 export default PixiGame;

@@ -44,7 +44,8 @@ export default PixiComponent('Viewport', {
     viewport
       .drag()
       .pinch({})
-      .wheel()
+      // Zoom glides over a few frames instead of jumping a step per wheel tick.
+      .wheel({ smooth: 6 })
       .decelerate()
       .clamp({ direction: 'all', underflow: 'center' })
       .setZoom(-10)

@@ -6,6 +6,7 @@ import { Stage } from '@pixi/react';
 import { ConvexProvider, useConvex, useQuery } from 'convex/react';
 import PlayerDetails from './PlayerDetails.tsx';
 import { api } from '../../convex/_generated/api';
+import { Doc } from '../../convex/_generated/dataModel';
 import { useWorldHeartbeat } from '../hooks/useWorldHeartbeat.ts';
 import { useHistoricalTime } from '../hooks/useHistoricalTime.ts';
 import { DebugTimeManager } from './DebugTimeManager.tsx';
@@ -16,6 +17,21 @@ import { useGodUi } from '../godUi.tsx';
 import { Gatherings } from './Gatherings.tsx';
 
 export const SHOW_DEBUG_UI = !!import.meta.env.VITE_SHOW_DEBUG_UI;
+
+// Sharp pixels on retina screens, but never above 2x: higher ratios multiply
+// the GPU work for no visible gain on pixel art.
+const STAGE_OPTIONS = {
+  backgroundColor: 0x7ab5ff,
+  resolution: Math.min(window.devicePixelRatio || 1, 2),
+  autoDensity: true,
+  antialias: false,
+  powerPreference: 'high-performance' as const,
+};
+
+function DebugTime({ engine }: { engine?: Doc<'engines'> }) {
+  const { timeManager } = useHistoricalTime(engine);
+  return <DebugTimeManager timeManager={timeManager} width={200} height={100} />;
+}
 
 export default function Game() {
   const convex = useConvex();
@@ -35,7 +51,6 @@ export default function Game() {
   useWorldHeartbeat();
 
   const worldState = useQuery(api.world.worldState, worldId ? { worldId } : 'skip');
-  const { historicalTime, timeManager } = useHistoricalTime(worldState?.engine);
 
   const scrollViewRef = useRef<HTMLDivElement>(null);
   // Pixi doesn't see React context, so pass the god UI state in as a prop.
@@ -65,13 +80,13 @@ export default function Game() {
   const showDetails = !!selectedElement || humanInConversation;
   return (
     <>
-      {SHOW_DEBUG_UI && <DebugTimeManager timeManager={timeManager} width={200} height={100} />}
+      {SHOW_DEBUG_UI && <DebugTime engine={worldState?.engine} />}
       <div className="relative h-full w-full">
         {/* Game area */}
         <div className="absolute inset-0 overflow-hidden bg-brown-900" ref={gameWrapperRef}>
           <div className="absolute inset-0">
             <div className="container">
-              <Stage width={width} height={height} options={{ backgroundColor: 0x7ab5ff }}>
+              <Stage width={width} height={height} options={STAGE_OPTIONS}>
                 {/* Re-propagate context because contexts are not shared between renderers.
 https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-531549215 */}
                 <ConvexProvider client={convex}>
@@ -81,7 +96,7 @@ https://github.com/michalochman/react-pixi-fiber/issues/145#issuecomment-5315492
                     engineId={engineId}
                     width={width}
                     height={height}
-                    historicalTime={historicalTime}
+                    engineStatus={worldState?.engine}
                     setSelectedElement={setSelectedElement}
                     speechRadius={speechRadius}
                     focus={focus}

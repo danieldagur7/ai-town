@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from 'convex/react';
 import { toast } from 'react-toastify';
 import { api } from '../../convex/_generated/api';
 import { useServerGame } from '../hooks/serverGame';
 import { ERAS } from '../../convex/aiTown/eras';
+import { useMenu } from '../hooks/useMenu';
 
 // Town news in the toolbar: the era, and a feed of buildings, births and deaths.
 // New events also pop up as toasts.
@@ -12,7 +13,7 @@ export default function TownNews() {
   const worldId = worldStatus?.worldId;
   const game = useServerGame(worldId);
   const events = useQuery(api.society.recentEvents, worldId ? { worldId } : 'skip');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useMenu('news');
   const seen = useRef<number | null>(null);
   useEffect(() => {
     if (!events) return;

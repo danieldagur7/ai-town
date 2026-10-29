@@ -14,6 +14,8 @@ export const lifeInputs = {
       identity: v.string(),
       plan: v.string(),
       child: v.optional(v.boolean()),
+      // A baby lives in a parent's house.
+      parentIds: v.optional(v.array(v.string())),
     },
     handler: (game, now, args) => {
       const playerId = Player.join(game, now, args.name, args.character, args.identity);
@@ -28,6 +30,9 @@ export const lifeInputs = {
           lastInviteAttempt: undefined,
           toRemember: undefined,
           child: args.child,
+          home: [...game.world.agents.values()].find(
+            (a) => a.home !== undefined && args.parentIds?.includes(a.playerId),
+          )?.home,
         }),
       );
       game.agentDescriptions.set(

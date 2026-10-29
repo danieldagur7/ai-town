@@ -16,6 +16,7 @@ import { fetchEmbedding, LLM_CONFIG } from './util/llm';
 import { chatCompletion } from './util/llm';
 import { startConversationMessage } from './agent/conversation';
 import { GameId } from './aiTown/ids';
+import { DAY_LENGTH, clockState } from './aiTown/clock';
 
 // Clear all of the tables except for the embeddings cache.
 const excludedTables: Array<TableNames> = ['embeddingsCache'];
@@ -198,5 +199,24 @@ export const testConvo = internalAction({
       'p:6' as GameId<'players'>,
     )) as any;
     return await a.readAll();
+  },
+});
+
+// Puts the world clock back on a given day, keeping the time of day. Needed
+// after changing phase lengths in constants.ts: the day number is worked out
+// from total elapsed time, so longer days would otherwise rewind the calendar
+// (and everyone's age). Stop the engine first (`testing:stop`), then resume.
+export const setClockDay = internalMutation({
+  args: { day: v.number() },
+  handler: async (ctx, { day }) => {
+    const worldStatus = await ctx.db
+      .query('worldStatus')
+      .filter((q) => q.eq(q.field('isDefault'), true))
+      .first();
+    const world = worldStatus && (await ctx.db.get(worldStatus.worldId));
+    if (!world?.clock) throw new Error('No world clock');
+    const elapsed = (day - 1) * DAY_LENGTH + (world.clock.elapsed % DAY_LENGTH);
+    await ctx.db.patch(world._id, { clock: { ...world.clock, elapsed } });
+    return clockState(elapsed);
   },
 });

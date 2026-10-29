@@ -1,6 +1,6 @@
 import * as PIXI from 'pixi.js';
 import { Container, Graphics, Sprite, TilingSprite, useTick } from '@pixi/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Project as ProjectState,
   Structure,
@@ -10,6 +10,8 @@ import {
 } from '../../convex/aiTown/project';
 import { houseArtKey, structureArtKey } from '../../convex/aiTown/eras';
 import { HOUSES } from '../../data/town';
+import { vivid } from '../vivid';
+import { sun } from '../sun';
 
 export type ArtByKey = Record<string, { status: string; url: string | null; subject: string }>;
 
@@ -63,6 +65,7 @@ export function ProjectSite({ project, tileDim }: { project: ProjectState; tileD
   );
   return (
     <Container x={(spot.x + 0.5) * tileDim} y={(spot.y + 1) * tileDim}>
+      <CastShadow texture={texture} />
       <Sprite texture={texture} anchor={{ x: 0.5, y: 1 }} />
       <Graphics draw={drawBar} y={4} />
     </Container>
@@ -107,6 +110,7 @@ function StructureSprite({
   const effects = structure.effects ?? [];
   return (
     <Container x={(spot.x + 0.5) * tileDim} y={(spot.y + 1) * tileDim}>
+      <CastShadow texture={texture} />
       {effects.includes('glow') && <Glow tileDim={tileDim} />}
       <Sprite texture={texture} anchor={{ x: 0.5, y: 1 }} />
       {effects.includes('sparkle') && <Sparkles tileDim={tileDim} />}
@@ -114,43 +118,74 @@ function StructureSprite({
   );
 }
 
-// A soft pulsing golden light behind something.
+// A soft pulsing golden light behind something. Drawn once; the pulse is a
+// scale/alpha change each frame, so nothing re-renders.
 export function Glow({ tileDim, color = 0xffe08a }: { tileDim: number; color?: number }) {
-  const [t, setT] = useState(0);
-  useTick((delta) => setT((x) => x + delta / 60));
+  const ref = useRef<PIXI.Graphics | null>(null);
+  const t = useRef(Math.random() * 10);
+  useTick((delta) => {
+    const g = ref.current;
+    if (!g) return;
+    t.current += delta / 60;
+    const pulse = 0.75 + 0.25 * Math.sin(t.current * 2);
+    g.scale.set(pulse);
+    g.alpha = pulse;
+  });
   const draw = useCallback(
     (g: PIXI.Graphics) => {
       g.clear();
-      const pulse = 0.75 + 0.25 * Math.sin(t * 2);
       for (let i = 5; i >= 1; i--) {
-        g.beginFill(color, 0.07 * pulse);
-        g.drawCircle(0, -tileDim * 1.4, tileDim * 0.45 * i * pulse);
+        g.beginFill(color, 0.07);
+        g.drawCircle(0, 0, tileDim * 0.45 * i);
         g.endFill();
       }
     },
-    [t, tileDim, color],
+    [tileDim, color],
   );
-  return <Graphics draw={draw} blendMode={PIXI.BLEND_MODES.ADD} />;
+  return <Graphics ref={ref} draw={draw} y={-tileDim * 1.4} blendMode={PIXI.BLEND_MODES.ADD} />;
 }
 
 function Sparkles({ tileDim }: { tileDim: number }) {
-  const [t, setT] = useState(0);
-  useTick((delta) => setT((x) => x + delta / 60));
-  const draw = useCallback(
-    (g: PIXI.Graphics) => {
-      g.clear();
-      for (let i = 0; i < 6; i++) {
-        const phase = (t * 0.7 + i / 6) % 1;
-        const x = Math.sin(i * 2.4 + t) * tileDim * 1.2;
-        const y = -tileDim * (0.5 + phase * 2.5);
-        g.beginFill(0xffffff, 1 - phase);
-        g.drawRect(x, y, 3, 3);
-        g.endFill();
-      }
-    },
-    [t, tileDim],
+  const ref = useRef<PIXI.Graphics | null>(null);
+  const t = useRef(0);
+  useTick((delta) => {
+    const g = ref.current;
+    if (!g) return;
+    t.current += delta / 60;
+    g.clear();
+    for (let i = 0; i < 6; i++) {
+      const phase = (t.current * 0.7 + i / 6) % 1;
+      const x = Math.sin(i * 2.4 + t.current) * tileDim * 1.2;
+      const y = -tileDim * (0.5 + phase * 2.5);
+      g.beginFill(0xffffff, 1 - phase);
+      g.drawRect(x, y, 3, 3);
+      g.endFill();
+    }
+  });
+  return <Graphics ref={ref} />;
+}
+
+// The object's own silhouette, darkened and laid on the ground behind it,
+// leaning away from the sun as the day goes on.
+function CastShadow({ texture }: { texture: PIXI.Texture }) {
+  const ref = useRef<PIXI.Sprite | null>(null);
+  useTick(() => {
+    const s = ref.current;
+    if (!s) return;
+    s.skew.x = -sun.lean * 0.9;
+    s.scale.y = 0.35 + Math.abs(sun.lean) * 0.15;
+    s.alpha = sun.strength * 0.75;
+  });
+  return (
+    <Sprite
+      ref={ref}
+      texture={texture}
+      anchor={{ x: 0.5, y: 1 }}
+      tint={0x1a1030}
+      scale={{ x: 1, y: 0.4 }}
+      alpha={0.35}
+    />
   );
-  return <Graphics draw={draw} />;
 }
 
 // From the Town era on, homes are redrawn in the era's style on top of the
@@ -191,13 +226,10 @@ function EraHouse({ x, y, url, tileDim }: { x: number; y: number; url: string; t
         height={tileDim * 5}
         tilePosition={{ x: 0, y: 0 }}
       />
-      <Sprite
-        texture={texture}
-        anchor={{ x: 0.5, y: 1 }}
-        x={(x + 1.5) * tileDim}
-        y={(y + 5) * tileDim}
-        scale={scale}
-      />
+      <Container x={(x + 1.5) * tileDim} y={(y + 5) * tileDim} scale={scale}>
+        <CastShadow texture={texture} />
+        <Sprite texture={texture} anchor={{ x: 0.5, y: 1 }} />
+      </Container>
     </>
   );
 }
@@ -206,7 +238,7 @@ function EraHouse({ x, y, url, tileDim }: { x: number; y: number; url: string; t
 let grass: PIXI.Texture | undefined;
 function grassTexture() {
   grass ??= new PIXI.Texture(
-    PIXI.BaseTexture.from('/ai-town/assets/gentle-obj.png', {
+    PIXI.BaseTexture.from(vivid('/ai-town/assets/gentle-obj.png'), {
       scaleMode: PIXI.SCALE_MODES.NEAREST,
     }),
     new PIXI.Rectangle((271 % 45) * 32, Math.floor(271 / 45) * 32, 32, 32),

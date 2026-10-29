@@ -12,7 +12,8 @@ import { pointsEqual, pathPosition } from '../util/geometry';
 import { Game } from './game';
 import { stopPlayer, findRoute, blocked, movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
-import { GOD_CHARACTER, characters } from '../../data/characters';
+import { GOD_CHARACTER } from '../../data/characters';
+import { isValidLook } from '../../data/looks';
 import { PlayerDescription } from './playerDescription';
 
 const pathfinding = v.object({
@@ -209,7 +210,7 @@ export class Player {
       { dx: 0, dy: -1 },
     ];
     const facing = facingOptions[Math.floor(Math.random() * facingOptions.length)];
-    if (character !== GOD_CHARACTER && !characters.find((c) => c.name === character)) {
+    if (character !== GOD_CHARACTER && !isValidLook(character)) {
       throw new Error(`Invalid character: ${character}`);
     }
     const playerId = game.allocId('players');

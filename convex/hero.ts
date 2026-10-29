@@ -11,7 +11,7 @@ import { api, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import { insertInput } from './aiTown/insertInput';
 import { clockState } from './aiTown/clock';
-import { characters } from '../data/characters';
+import { isValidLook } from '../data/looks';
 import {
   DEFAULT_NAME,
   HERO_START_AGE,
@@ -133,7 +133,7 @@ export const createHero = mutation({
     }
     const name = args.name.trim();
     if (!name) throw new ConvexError('Give your character a name');
-    if (!characters.find((c) => c.name === args.character)) {
+    if (!isValidLook(args.character)) {
       throw new ConvexError('Pick a look');
     }
     const taken = await ctx.db
@@ -289,6 +289,7 @@ export const heroLife = internalQuery({
       age: ageOf(hero, dayOf(world)),
       deathAge: hero.deathAge,
       bio: hero.bio,
+      character: hero.character,
       playerId: hero.playerId,
       inWorld: !!hero.playerId && !!world?.players.some((p) => p.id === hero.playerId),
     };

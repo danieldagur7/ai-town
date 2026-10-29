@@ -1,13 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConvex, useMutation, useQuery } from 'convex/react';
 import { toast } from 'react-toastify';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { characters } from '../../data/characters';
+import {
+  ACCESSORIES,
+  Accessory,
+  BASES,
+  HAIR_COLOURS,
+  Look,
+  OUTFIT_COLOURS,
+  QUIRKS,
+  QUIRK_NAMES,
+  lookString,
+  parseLook,
+  quirkOf,
+  randomLook,
+} from '../../data/looks';
+import { lookPreviewUrl } from '../lookTexture';
+import { vivid } from '../vivid';
 import { useSendInput, waitForInput } from '../hooks/sendInput';
 import { toastOnError } from '../toasts';
 import { useServerGame } from '../hooks/serverGame';
 import { useGodUi } from '../godUi';
+import { useMenu } from '../hooks/useMenu';
 
 const panel =
   'pointer-events-auto absolute left-0 top-full mt-2 z-20 w-80 max-w-[calc(100vw-1.5rem)] max-h-[calc(100vh-10rem)] overflow-y-auto border-8 border-brown-900 bg-brown-800 text-brown-100 shadow-2xl p-3 flex flex-col gap-3';
@@ -20,7 +37,7 @@ export default function HeroMenu() {
   const game = useServerGame(worldId);
   const mine = useQuery(api.hero.myHero, worldId ? { worldId } : 'skip');
   const humanToken = useQuery(api.world.userStatus, worldId ? { worldId } : 'skip');
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useMenu('hero');
   if (!worldStatus || !game || mine === undefined) return null;
   const me = [...game.world.players.values()].find((p) => p.human === humanToken);
   const playingHero = !!me && !!mine.hero && me.id === mine.hero.playerId;
@@ -32,7 +49,9 @@ export default function HeroMenu() {
         onClick={() => setOpen(!open)}
       >
         <div className="inline-block bg-clay-700">
-          <span>🧍 {label}</span>
+          <span>
+            <i className="not-italic">🧍</i> {label}
+          </span>
         </div>
       </button>
       {open && (
@@ -57,20 +76,125 @@ export default function HeroMenu() {
 
 type Mine = NonNullable<ReturnType<typeof useQuery<typeof api.hero.myHero>>>;
 
+const ACCESSORY_LABELS: Record<Accessory, string> = {
+  none: 'No extra',
+  hat: '🎩 Hat',
+  cap: '🧢 Cap',
+  glasses: '👓 Glasses',
+  flower: '🌸 Flower',
+  bow: '🎀 Bow',
+  scarf: '🧣 Scarf',
+  beard: '🧔 Beard',
+  headband: '🎽 Headband',
+};
+
 function SpritePreview({ character }: { character: string }) {
-  const c = characters.find((c) => c.name === character)!;
+  const look = parseLook(character);
+  const c = characters.find((c) => c.name === look.base) ?? characters[0];
+  const [url, setUrl] = useState(vivid(c.textureUrl));
+  useEffect(() => {
+    let live = true;
+    void lookPreviewUrl(look, vivid(c.textureUrl)).then((u) => live && setUrl(u));
+    return () => {
+      live = false;
+    };
+  }, [look.base, look.hair, look.outfit]);
   const frame = (c.spritesheetData.frames as any).down.frame;
   return (
-    <div
-      className="pixelated"
-      style={{
-        width: 32,
-        height: 32,
-        backgroundImage: `url(${c.textureUrl})`,
-        backgroundPosition: `-${frame.x}px -${frame.y}px`,
-        transform: 'scale(1.5)',
-      }}
-    />
+    <div className={`look-preview quirk-${quirkOf('', character)}`}>
+      <div
+        className="pixelated"
+        style={{
+          width: 32,
+          height: 32,
+          backgroundImage: `url(${url})`,
+          backgroundPosition: `-${frame.x}px -${frame.y}px`,
+        }}
+      />
+    </div>
+  );
+}
+
+// The feature wheel: step through each feature, or spin for a random look.
+function LookWheel({ value, onChange }: { value: Look; onChange: (look: Look) => void }) {
+  const [spinning, setSpinning] = useState(false);
+  const cycle = <T,>(list: readonly T[], current: T, step: number) =>
+    list[(list.indexOf(current) + step + list.length) % list.length];
+  const rows: { label: string; text: string; step: (d: number) => Look }[] = [
+    {
+      label: 'Body',
+      text: `${BASES.indexOf(value.base) + 1} / ${BASES.length}`,
+      step: (d) => ({ ...value, base: cycle(BASES, value.base, d) }),
+    },
+    {
+      label: 'Hair',
+      text: HAIR_COLOURS[value.hair].name,
+      step: (d) => ({
+        ...value,
+        hair: (value.hair + d + HAIR_COLOURS.length) % HAIR_COLOURS.length,
+      }),
+    },
+    {
+      label: 'Outfit',
+      text: OUTFIT_COLOURS[value.outfit].name,
+      step: (d) => ({
+        ...value,
+        outfit: (value.outfit + d + OUTFIT_COLOURS.length) % OUTFIT_COLOURS.length,
+      }),
+    },
+    {
+      label: 'Extra',
+      text: ACCESSORY_LABELS[value.accessory],
+      step: (d) => ({ ...value, accessory: cycle(ACCESSORIES, value.accessory, d) }),
+    },
+    {
+      label: 'Habit',
+      text: value.quirk ?? 'still',
+      step: (d) => ({ ...value, quirk: cycle(QUIRK_NAMES, value.quirk ?? 'still', d) }),
+    },
+  ];
+  const spin = () => {
+    if (spinning) return;
+    setSpinning(true);
+    // A few quick random looks, slowing down, then it lands.
+    const delays = [60, 70, 85, 100, 120, 150, 190, 240];
+    let at = 0;
+    delays.forEach((ms, i) => {
+      at += ms;
+      setTimeout(() => {
+        onChange(randomLook());
+        if (i === delays.length - 1) setSpinning(false);
+      }, at);
+    });
+  };
+  return (
+    <div className="flex gap-3 items-center">
+      <div className="flex flex-col items-center gap-2">
+        <div className={`look-stage ${spinning ? 'spinning' : ''}`}>
+          <SpritePreview character={lookString(value)} />
+        </div>
+        <button className="bg-clay-700 text-white text-sm px-2 py-1" onClick={spin}>
+          🎲 Spin
+        </button>
+      </div>
+      <div className="flex-1 flex flex-col gap-1 text-sm">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-1">
+            <span className="w-12 text-brown-300 text-xs">{r.label}</span>
+            <button className="wheel-arrow" onClick={() => onChange(r.step(-1))}>
+              ◀
+            </button>
+            <span className="flex-1 text-center truncate capitalize">{r.text}</span>
+            <button className="wheel-arrow" onClick={() => onChange(r.step(1))}>
+              ▶
+            </button>
+          </div>
+        ))}
+        <p className="text-xs text-brown-300 italic">
+          {QUIRKS[value.quirk ?? 'still'].split(' (')[0]}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -78,7 +202,8 @@ function NoHero({ worldId, mine }: { worldId: Id<'worlds'>; mine: Mine }) {
   const create = useMutation(api.hero.createHero);
   const playAsHeir = useMutation(api.hero.playAsHeir);
   const [name, setName] = useState('');
-  const [character, setCharacter] = useState(characters[0].name);
+  const [look, setLook] = useState<Look>(() => randomLook());
+  const character = lookString(look);
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState('');
   return (
@@ -119,17 +244,7 @@ function NoHero({ worldId, mine }: { worldId: Id<'worlds'>; mine: Mine }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <div className="flex flex-wrap gap-2">
-          {characters.map((c) => (
-            <button
-              key={c.name}
-              className={`p-2 ${character === c.name ? 'bg-clay-700' : 'bg-brown-900'}`}
-              onClick={() => setCharacter(c.name)}
-            >
-              <SpritePreview character={c.name} />
-            </button>
-          ))}
-        </div>
+        <LookWheel value={look} onChange={setLook} />
         <textarea
           className="text-sm text-black bg-white p-2 resize-none"
           rows={3}

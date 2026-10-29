@@ -65,10 +65,15 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   `testing:stop` → `townMap:applyTownMap` → `testing:resume`.
 - **Day/night** (`convex/aiTown/clock.ts`, always on): `world.clock.elapsed` advances in
   `Game.tick` (capped per tick, so stopped worlds don't skip ahead). Phases and
-  durations are in `convex/constants.ts`; beds are in `data/beds.ts` (looked up by
-  `convex/aiTown/beds.ts`). In the evening wind-down agents stop inviting and walk to
-  bed; at night `Agent.tickNight` ends conversations, remembers them, and sleeps
-  (activity `sleeping` 😴); they wake on the next morning. UI: `ClockBadge`,
+  durations are in `convex/constants.ts` (15 min of daylight, 1 min night). Each agent
+  has a `home` (index into `HOUSES`, handed out by `homeOf` in `convex/aiTown/beds.ts`;
+  babies get a parent's). In the evening wind-down agents stop inviting; at night
+  `Agent.tickNight` ends conversations, remembers them, and `goHome` teleports them to
+  their door and they sleep (activity `sleeping` 😴); they wake on the next morning.
+  Sleepers by a door are drawn as inside (`Player.tsx` hides them, `Beds.tsx` draws
+  snoring over the roof). `data/beds.ts` (old tent beds) only keeps building sites clear.
+  **Changing phase lengths shifts the day number** (day = elapsed / day length): stop
+  the engine, run `testing:setClockDay '{"day": N}'`, resume. UI: `ClockBadge`,
   `DayNightOverlay`, `Beds`.
 - **God mode** (`src/components/GodMenu.tsx`): a pop-up menu in the toolbar.
   - Skip to next phase: engine input in `convex/aiTown/godMode.ts`.
@@ -178,6 +183,18 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   LLM work calls `yieldToPlayer` (`convex/priority.ts`) and waits while a human is
   talking to someone. At bedtime nobody leaves a conversation with a human. Diagnose slowness by counting
   `lsof -iTCP:11434 -sTCP:ESTABLISHED` connections and `npx convex logs`.
+- **Looks** (`data/looks.ts`): a player's `character` string packs a base sprite and
+  feature-wheel picks, e.g. `f3~h2~o5~a:glasses~q:bouncy` (hair colour, outfit colour,
+  accessory, idle quirk); plain `f3` still works. `src/lookTexture.ts` recolours the
+  sheet once per look; `Character.tsx` draws accessories, the quirk, walk bounce and a
+  sun-following shadow (`src/sun.ts`). Newcomers spin the wheel (the LLM picks their
+  quirk in the same call that invents them); babies take after their parents. The
+  original cast's quirks are in `NAMED_QUIRKS`. Hero creation has the wheel UI.
+- **Rendering performance**: only the `Players` layer in `PixiGame.tsx` re-renders each
+  frame (interpolated time); everything animated (quirks, shadows, glow, windmill sails,
+  snoring) mutates Pixi objects in `useTick`/the shared ticker without React state and
+  without allocating. Windmills are a still tower + turning sails
+  (`scripts/split_windmill.py`). In dev, `globalThis.__PIXI_APP__` exposes the scene.
 - **Lessons** (`lessons` table in `convex/life.ts`): each accident makes that activity
   less likely for everyone (deaths count 3×); kids take more risks.
 - **Local pixel-art generation**: `scripts/generate_sprite.py` (SDXL-Turbo +

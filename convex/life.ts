@@ -14,7 +14,7 @@ import { api, internal } from './_generated/api';
 import { Id } from './_generated/dataModel';
 import { chatCompletion, fetchEmbedding } from './util/llm';
 import { clockState } from './aiTown/clock';
-import { characters } from '../data/characters';
+import { QUIRKS, QUIRK_NAMES, childLook, lookString, randomLook } from '../data/looks';
 import {
   ADULT_AGE,
   BIRTH_CHANCE_AT_TARGET,
@@ -307,6 +307,7 @@ export const lifeCycle = internalAction({
             age: hero.age,
             deathAge: hero.deathAge,
             identity: hero.bio,
+            character: hero.character,
           }
         : undefined;
     if (heroParent) {
@@ -337,7 +338,14 @@ export const lifeCycle = internalAction({
   },
 });
 
-type Person = { playerId: string; name: string; age: number; deathAge: number; identity: string };
+type Person = {
+  playerId: string;
+  name: string;
+  age: number;
+  deathAge: number;
+  identity: string;
+  character: string;
+};
 
 async function die(
   ctx: ActionCtx,
@@ -392,12 +400,15 @@ async function birth(
     messages: [
       {
         role: 'user',
-        content: `${prompt}\nReply with one line: <Name> | <personality in under 30 words, third person>`,
+        content:
+          `${prompt}\nAlso pick the little idle habit that shows their personality, one of: ` +
+          QUIRK_NAMES.map((q) => `${q} (${QUIRKS[q]})`).join(', ') +
+          `.\nReply with one line: <Name> | <personality in under 30 words, third person> | <habit>`,
       },
     ],
     max_tokens: 80,
   });
-  let [rawName, rawIdentity] = content.trim().split('\n')[0].split('|');
+  let [rawName, rawIdentity, rawQuirk] = content.trim().split('\n')[0].split('|');
   if (given?.name) rawName = given.name;
   if (given?.description) rawIdentity = given.description;
   const name = rawName
@@ -412,9 +423,13 @@ async function birth(
     (parents.length === 2
       ? `${name} is the child of ${parents[0].name} and ${parents[1].name}. `
       : `${name} recently moved to town. `) + (rawIdentity ?? '').trim();
-  const free = characters.map((c) => c.name).filter((c) => !data.usedCharacters.includes(c));
-  const pool = free.length > 0 ? free : characters.map((c) => c.name);
-  const character = pool[Math.floor(Math.random() * pool.length)];
+  // Their look comes from the feature wheel; a baby takes after its parents.
+  const quirk = QUIRK_NAMES.find((q) => rawQuirk?.toLowerCase().includes(q));
+  const character = lookString(
+    parents.length === 2
+      ? childLook(parents[0].character, parents[1].character, quirk)
+      : randomLook(quirk),
+  );
   const inputId = await ctx.runMutation(api.aiTown.main.sendInput, {
     worldId,
     name: 'residentBorn',
@@ -425,6 +440,7 @@ async function birth(
       plan:
         parents.length === 2 ? 'You want to grow up and find your place.' : 'You want to fit in.',
       child: parents.length === 2,
+      parentIds: parents.map((p) => p.playerId),
     },
   });
   // Wait for the engine to create them, to learn their player id.
@@ -488,6 +504,7 @@ export const lifeData = internalQuery({
         age: ageOf(r, day),
         deathAge: r.deathAge,
         identity: (ad?.identity ?? '').split('.')[0],
+        character: pd.character,
       });
     }
     const feelings: Record<string, { affinity: number; crush: boolean }> = {};

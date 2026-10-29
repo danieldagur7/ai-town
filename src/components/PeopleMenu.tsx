@@ -1,14 +1,14 @@
-import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { useServerGame } from '../hooks/serverGame';
 import { useGodUi } from '../godUi';
 import Button from './buttons/Button';
 import peopleImg from '../../assets/people.svg';
+import { useMenu } from '../hooks/useMenu';
 
 // Lists everyone in town; picking someone flies the camera to them.
 export default function PeopleMenu() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useMenu('people');
   const worldStatus = useQuery(api.world.defaultWorldStatus);
   const game = useServerGame(worldStatus?.worldId);
   const { focusOn } = useGodUi();

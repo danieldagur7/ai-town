@@ -90,19 +90,16 @@ export const MAX_PATHFINDS_PER_STEP = 16;
 
 export const DEFAULT_NAME = 'Me';
 
-// Day/night clock. Real milliseconds spent in each phase: 8 minutes of
+// Day/night clock. Real milliseconds spent in each phase: 15 minutes of
 // daylight (morning, day, evening) and a 1-minute night. The clock only runs while the engine does.
-export const MORNING_DURATION = 120_000;
-export const DAY_DURATION = 240_000;
-export const EVENING_DURATION = 120_000;
+export const MORNING_DURATION = 180_000;
+export const DAY_DURATION = 540_000;
+export const EVENING_DURATION = 180_000;
 export const NIGHT_DURATION = 60_000;
 
 // Agents stop starting new conversations for the last part of the evening.
 export const EVENING_WIND_DOWN = 60_000;
 
-// Agents start walking to bed at the wind-down. If one hasn't arrived this long
-// after setting off, it sleeps where it stands.
-export const BED_WALK_TIMEOUT = 90_000;
 
 // Cap on how far the clock moves in one tick, so restarting a stopped world
 // doesn't skip ahead.
@@ -186,7 +183,7 @@ export const STATUE_COST = { wood: 30, stone: 60 };
 // town advances to the next one (see convex/aiTown/eras.ts).
 export const BUILDING_WORK_NEEDED = 12;
 export const BUILDING_COST = { wood: 15, stone: 20 };
-export const ERA_PROJECTS = 2;
+export const ERA_PROJECTS = 6;
 
 // Life and death. A game day ages everyone YEARS_PER_DAY years. Existing
 // townspeople start between START_AGE_MIN/MAX; everyone gets a lifespan between
