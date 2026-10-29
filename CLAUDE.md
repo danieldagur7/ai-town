@@ -17,6 +17,9 @@ Order matters: Ollama, then the Convex backend, then the dev server.
    source /opt/homebrew/opt/nvm/nvm.sh && nvm use 18 && npm run dev
    ```
    App: http://localhost:5173/ai-town. `predev` pushes functions and runs `init`.
+4. **Pixel-art server** (terminal 3, optional but needed for new building art):
+   `just imagegen` (port 7861, keeps SDXL-Turbo + pixel-art LoRA loaded, ~15 s/image).
+   Without it buildings fall back to a generic cottage sprite.
 
 Backend env: `just convex env set LLM_MODEL gemma3:12b` (already set; survives restarts,
 not `reset-local-backend`). The repo path contains a space, so `just` prints a harmless
@@ -133,6 +136,35 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   (Pixi stage + details pop-up), `PixiGame.tsx` / `PixiStaticMap.tsx` / `Player.tsx` /
   `Character.tsx` (rendering), `PlayerDetails.tsx` / `Messages.tsx` (chat).
   Messages live in the regular `messages` table, outside the engine.
+- **Society** (`convex/aiTown/project.ts`, `eras.ts`, `economy.ts`; `convex/society.ts`):
+  one `world.project` at a time (statue or any building) and finished `world.structures`.
+  Townspeople propose the next building each morning (`proposeProject`, era-aware); the
+  god commands builds from God menu → Build or the console. God builds come with
+  materials; proposals must be gathered for. Workers are plain rules (`tickWorker` /
+  `chooseJob`): food first, then missing wood/stone, then building. Every
+  `ERA_PROJECTS` buildings → next era (Village → Space Age), and homes are redrawn in
+  the era style (`EraHouses`). Each morning `morningMeal` feeds everyone; hunger hurts
+  wellbeing and `STARVATION_DAYS` in a row kills the frailest. News feed: `townEvents`.
+- **Art** (`convex/art.ts`, `scripts/imagegen_server.py`): the engine names art by key
+  (`structure:<id>`, `house:<era>:<style>`); `requestArt` calls the local server and
+  stores PNGs in Convex storage; `artByKey` feeds the map. Redraw from God menu → Build.
+- **Life** (`convex/life.ts`, `lifeInputs.ts`): `residents` table holds birth day,
+  lifespan and wellbeing (0–100). `YEARS_PER_DAY` ages everyone; each morning
+  `lifeCycle` does at most one death and maybe one birth (fond adult couple, or a
+  newcomer below `POPULATION_TARGET`, max `MAX_POPULATION`, `MAX_CHILDREN`). Risky
+  activities can injure or kill (`accident`). Age, wellbeing and god traits go into
+  prompts (`ageLine`, `wellbeingLine`, `traitsPrompt`). Children don't work or get crushes.
+- **Admin console** (`convex/god/admin.ts`): plain-language command → JSON ops validated
+  and applied (stats, notes, effects, resources, memories, feelings, faith, wellbeing,
+  age, death, newcomers, builds, era, decrees, announcements). Granted prayers reuse it
+  with a restricted op list (`grantPrayer`).
+- **Hero** (`convex/hero.ts`, `heroInputs.ts`, `src/components/HeroMenu.tsx`): the
+  player's own persistent character (replaces the old random "Me"). Ages and dies for
+  good; then create a new one or `playAsHeir` (take over your child: their agent is
+  removed and feelings toward them carry over). Can work (wood/stone/farm/build), pray,
+  join and speak in gatherings, and be a parent.
+- **Memory cost**: `rememberConversation` uses one JSON call for summary, importance and
+  feeling change (was three).
 - **Statue project** (`convex/aiTown/project.ts`): `world.project` holds work done
   out of `workNeeded` shifts and the material bill. God menu → Statue →
   "Build a statue of me" (`startStatue` input) tops the stockpile up to the cost,

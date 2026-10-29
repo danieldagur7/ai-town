@@ -28,3 +28,7 @@ convex *ARGS:
 # Clears any data or stored files from the local backend.
 reset-local-backend:
   rm -rf convex_local_storage && rm -f convex_local_backend.sqlite3
+
+# Local pixel-art server the game uses to draw new buildings (port 7861).
+imagegen:
+  cd {{invocation_directory()}}; HF_HUB_OFFLINE=1 ../imagegen/.venv/bin/python scripts/imagegen_server.py

@@ -12,11 +12,13 @@ export default function PeopleMenu() {
   const worldStatus = useQuery(api.world.defaultWorldStatus);
   const game = useServerGame(worldStatus?.worldId);
   const { focusOn } = useGodUi();
+  const ages = useQuery(api.life.ages, worldStatus ? { worldId: worldStatus.worldId } : 'skip');
   const people = game
     ? [...game.world.players.values()]
         .map((p) => ({
           id: p.id,
           name: game.playerDescriptions.get(p.id)?.name ?? p.id,
+          age: ages?.[p.id]?.age,
           emoji: p.activity && p.activity.until > Date.now() ? p.activity.emoji : undefined,
           talking: !!game.world.playerConversation(p),
           gathering: game.world.gatherings.find((g) => g.participants.includes(p.id))?.kind,
@@ -39,7 +41,10 @@ export default function PeopleMenu() {
                 setOpen(false);
               }}
             >
-              <span>{p.name}</span>
+              <span>
+                {p.name}
+                {p.age !== undefined && <span className="text-sm text-brown-300"> {p.age}</span>}
+              </span>
               <span>
                 {p.gathering === 'meeting' ? '📣' : p.gathering === 'group' ? '👥' : ''}
                 {p.talking ? '💬' : ''}

@@ -13,7 +13,12 @@ import { useServerGame } from '../hooks/serverGame';
 import { useGodUi } from '../godUi';
 import { GOD_CHARACTER } from '../../data/characters';
 import { BUILDING as BUILDING_ACTIVITY } from '../../convex/aiTown/project';
-import { GOD_SPEECH_DEFAULT_RADIUS, GOD_SPEECH_MAX_RADIUS } from '../../convex/constants';
+import { ERAS, structureArtKey } from '../../convex/aiTown/eras';
+import {
+  ERA_PROJECTS,
+  GOD_SPEECH_DEFAULT_RADIUS,
+  GOD_SPEECH_MAX_RADIUS,
+} from '../../convex/constants';
 
 // The god's toolbox: a pop-up menu that collects the god-mode features.
 export default function GodMenu() {
@@ -58,10 +63,11 @@ function GodMenuPanel({
           </span>
         </a>
       </div>
+      <AdminConsole worldId={worldId} />
       <Manifest worldId={worldId} engineId={engineId} />
       <PrayerInbox worldId={worldId} />
       <Decrees worldId={worldId} engineId={engineId} />
-      <Statue worldId={worldId} engineId={engineId} />
+      <Build worldId={worldId} engineId={engineId} />
       <MeetingSummaries worldId={worldId} />
       <FaithScores worldId={worldId} />
       <TownDebug engineId={engineId} />
@@ -76,6 +82,65 @@ function GodMenuPanel({
         </Button>
       </section>
     </div>
+  );
+}
+
+// Type to change anything: the model turns it into world edits.
+function AdminConsole({ worldId }: { worldId: Id<'worlds'> }) {
+  const run = useAction(api.god.admin.runCommand);
+  const log = useQuery(api.god.admin.recentCommands, { worldId });
+  const [command, setCommand] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!command.trim()) return;
+    setBusy(true);
+    try {
+      const result = await toastOnError(run({ worldId, command }));
+      toast(result.reply, { autoClose: 5000 });
+      setCommand('');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xl">Command the world</h3>
+      <textarea
+        className="text-sm text-black bg-white p-2 resize-none"
+        rows={2}
+        placeholder="e.g. give everyone 20% more strength, make the statue glow, Bob falls for Alice"
+        value={command}
+        disabled={busy}
+        onChange={(e) => setCommand(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            void submit();
+          }
+        }}
+      />
+      <button
+        className="bg-clay-700 text-white text-sm py-1 disabled:opacity-50"
+        disabled={busy || !command.trim()}
+        onClick={() => void submit()}
+      >
+        {busy ? 'Working…' : 'Make it so'}
+      </button>
+      {log && log.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-brown-300">Recent commands</summary>
+          {log.map((l) => (
+            <div key={l._id} className="bg-brown-900 p-2 mt-1 leading-snug">
+              <b>&gt; {l.command}</b>
+              <p className="text-brown-300">{l.reply}</p>
+              {l.applied.map((a, i) => (
+                <p key={i}>• {a}</p>
+              ))}
+            </div>
+          ))}
+        </details>
+      )}
+    </section>
   );
 }
 
@@ -614,44 +679,67 @@ function TownDebug({ engineId }: { engineId: Id<'engines'> }) {
   );
 }
 
-// The town's building project: start the statue, watch it go up.
-function Statue({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'engines'> }) {
+// Building and progress: start the statue or anything else, watch it go up,
+// redraw generated art, and (debug) nudge the era.
+function Build({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'engines'> }) {
   const game = useServerGame(worldId);
+  const art = useQuery(api.art.artByKey, { worldId });
+  const redraw = useMutation(api.art.redrawArt);
   const startStatue = useSendInput(engineId, 'startStatue');
+  const startProject = useSendInput(engineId, 'startProject');
   const addWork = useSendInput(engineId, 'addProjectWork');
-  const project = game?.world.project;
-  const working = game
-    ? [...game.world.players.values()]
-        .filter(
-          (p) => p.activity?.description === BUILDING_ACTIVITY && p.activity.until > Date.now(),
-        )
-        .map((p) => game.playerDescriptions.get(p.id)?.name)
-    : [];
+  const cancelProject = useSendInput(engineId, 'cancelProject');
+  const setEra = useSendInput(engineId, 'setEra');
+  const [name, setName] = useState('');
+  const [look, setLook] = useState('');
+  if (!game) return null;
+  const { project, structures, era } = game.world;
+  const eraInfo = ERAS[era];
+  const working = [...game.world.players.values()]
+    .filter(
+      (p) => p.activity?.description.startsWith(BUILDING_ACTIVITY) && p.activity.until > Date.now(),
+    )
+    .map((p) => game.playerDescriptions.get(p.id)?.name);
+  const hasStatue = structures.some((s) => s.kind === 'statue') || project?.kind === 'statue';
+  const build = () => {
+    void toastOnError(startProject({ name, subject: look || undefined }));
+    setName('');
+    setLook('');
+  };
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="text-xl">Statue</h3>
-      {!project || project.finishedDay !== undefined ? (
-        <>
-          {project && (
-            <p className="text-sm text-brown-300">
-              🗿 {project.name} was finished on day {project.finishedDay}.
-            </p>
-          )}
-          <p className="text-sm text-brown-300">
-            The town has gathered the wood and stone; command them to build a statue on the plaza.
-            Townspeople work on it by day.
-          </p>
+      <h3 className="text-xl">Build</h3>
+      <div className="flex items-center gap-2 text-sm">
+        <span>
+          {eraInfo.emoji} {eraInfo.name} era
+        </span>
+        <span className="text-brown-300 text-xs">
+          ({structures.filter((s) => s.era === era).length}/{ERA_PROJECTS} buildings to advance)
+        </span>
+        <span className="ml-auto flex gap-1">
           <button
-            className="bg-clay-700 text-white text-sm py-1"
-            onClick={() => void toastOnError(startStatue({}))}
+            className="bg-brown-900 text-white text-xs px-2"
+            title="Debug: previous era"
+            onClick={() => void toastOnError(setEra({ era: era - 1 }))}
           >
-            Build a statue of me
+            −
           </button>
-        </>
-      ) : (
+          <button
+            className="bg-brown-900 text-white text-xs px-2"
+            title="Debug: next era"
+            onClick={() => void toastOnError(setEra({ era: era + 1 }))}
+          >
+            +
+          </button>
+        </span>
+      </div>
+      {project ? (
         <>
           <p className="text-sm">
-            🗿 {project.name}: {Math.floor((100 * project.work) / project.workNeeded)}%
+            🏗️ {project.name}: {Math.floor((100 * project.work) / project.workNeeded)}%
+            {project.proposer && (
+              <span className="text-brown-300"> (proposed by {project.proposer})</span>
+            )}
           </p>
           <div className="h-3 bg-brown-900">
             <div
@@ -665,17 +753,97 @@ function Statue({ worldId, engineId }: { worldId: Id<'worlds'>; engineId: Id<'en
           <p className="text-xs text-brown-300">
             {working.length > 0
               ? `🔨 ${working.join(', ')} at work.`
-              : 'Nobody is working right now.'}{' '}
-            Started day {project.startedDay}.
+              : 'Nobody is working right now (they work by day).'}
           </p>
-          <button
-            className="bg-brown-900 text-white text-xs py-1"
-            title="Debug: add 5 shifts of work"
-            onClick={() => void toastOnError(addWork({ shifts: 5 }))}
-          >
-            +5 shifts (debug)
-          </button>
+          <div className="flex gap-1">
+            <button
+              className="flex-1 bg-brown-900 text-white text-xs py-1"
+              title="Debug: add 5 shifts of work"
+              onClick={() => void toastOnError(addWork({ shifts: 5 }))}
+            >
+              +5 shifts (debug)
+            </button>
+            <button
+              className="flex-1 bg-brown-900 text-white text-xs py-1"
+              onClick={() => void toastOnError(cancelProject({}))}
+            >
+              Cancel project
+            </button>
+          </div>
         </>
+      ) : (
+        <>
+          {!hasStatue && (
+            <button
+              className="bg-clay-700 text-white text-sm py-1"
+              onClick={() => void toastOnError(startStatue({}))}
+            >
+              Build a statue of me
+            </button>
+          )}
+          <input
+            className="text-sm text-black bg-white p-2"
+            placeholder={`Build anything, e.g. ${eraInfo.ideas.split(', ')[0]}`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            className="text-sm text-black bg-white p-2"
+            placeholder="What it looks like (optional)"
+            value={look}
+            onChange={(e) => setLook(e.target.value)}
+          />
+          <button
+            className="bg-clay-700 text-white text-sm py-1 disabled:opacity-50"
+            disabled={!name.trim()}
+            onClick={build}
+          >
+            Command them to build it
+          </button>
+          <p className="text-xs text-brown-300">
+            Left alone, townspeople propose something new each morning.
+          </p>
+        </>
+      )}
+      {structures.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer">Built ({structures.length})</summary>
+          <ul className="flex flex-col gap-1 mt-1">
+            {structures.map((s) => {
+              const a = art?.[structureArtKey(s.id)];
+              return (
+                <li key={s.id} className="flex items-center gap-2 bg-brown-900 p-1">
+                  {s.kind === 'statue' ? (
+                    <img
+                      src="/ai-town/assets/projects/statue_2.png"
+                      className="w-8 h-8 object-contain pixelated"
+                    />
+                  ) : a?.url ? (
+                    <img src={a.url} className="w-8 h-8 object-contain pixelated" />
+                  ) : (
+                    <span className="w-8 text-center">
+                      {a?.status === 'generating' ? '🎨' : '🏠'}
+                    </span>
+                  )}
+                  <span className="flex-1">
+                    {s.name} <span className="text-xs text-brown-300">day {s.builtDay}</span>
+                  </span>
+                  {s.kind !== 'statue' && (
+                    <button
+                      className="text-xs bg-clay-700 px-1"
+                      title="Generate new art for it"
+                      onClick={() =>
+                        void toastOnError(redraw({ worldId, key: structureArtKey(s.id) }))
+                      }
+                    >
+                      Redraw
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
     </section>
   );

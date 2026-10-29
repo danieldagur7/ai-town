@@ -2,9 +2,14 @@ import { v } from 'convex/values';
 import { DatabaseReader, internalMutation, query } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { playerId } from '../aiTown/ids';
+import { clockState } from '../aiTown/clock';
+import { ageOf } from '../life';
 import {
   CRUSH_CHANCE,
   MAX_AFFINITY_CHANGE,
+  ADULT_AGE,
+  CRUSH_DEVELOP_AFFINITY,
+  CRUSH_DEVELOP_CHANCE,
   MUTUAL_CRUSH_CHANCE,
   STARTING_AFFINITY,
 } from '../constants';
@@ -16,11 +21,27 @@ export const seedRelationships = internalMutation({
   handler: async (ctx, { worldId }) => {
     const world = await ctx.db.get(worldId);
     if (!world) return;
+    // Townspeople, plus the player's own character if it's in the world.
     const ids = world.agents.map((a) => a.playerId);
+    const hero = await ctx.db
+      .query('heroes')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId).eq('status', 'alive'))
+      .first();
+    if (hero?.playerId && world.players.some((p) => p.id === hero.playerId)) {
+      ids.push(hero.playerId);
+    }
     const existing = await ctx.db
       .query('relationships')
       .withIndex('pair', (q) => q.eq('worldId', worldId))
       .collect();
+    // Romance is for adults only: clear any crush involving a child.
+    const minors = await minorIds(ctx.db, worldId);
+    for (const r of existing) {
+      if (r.crush && (minors.has(r.playerId) || minors.has(r.otherId))) {
+        await ctx.db.patch(r._id, { crush: false });
+        r.crush = false;
+      }
+    }
     const has = (a: string, b: string) => existing.some((r) => r.playerId === a && r.otherId === b);
     const crushOf = new Map(existing.filter((r) => r.crush).map((r) => [r.playerId, r.otherId]));
     const rows = new Map<string, { affinity: number; crush: boolean }>();
@@ -35,8 +56,8 @@ export const seedRelationships = internalMutation({
       }
     }
     for (const a of ids) {
-      if (crushOf.has(a) || Math.random() >= CRUSH_CHANCE) continue;
-      const others = ids.filter((b) => b !== a && rows.has(`${a}|${b}`));
+      if (crushOf.has(a) || minors.has(a) || Math.random() >= CRUSH_CHANCE) continue;
+      const others = ids.filter((b) => b !== a && !minors.has(b) && rows.has(`${a}|${b}`));
       const b = others[Math.floor(Math.random() * others.length)];
       if (!b) continue;
       rows.set(`${a}|${b}`, { affinity: 50, crush: true });
@@ -86,7 +107,7 @@ export function relationshipPrompt(
           ? `You don't know ${name} that well; you feel neutral about them.`
           : a > -60
             ? `You don't like ${name} much, and it shows a little.`
-            : `You can't stand ${name}.`;
+            : `You can't stand ${name}, and you can be openly cutting or cruel to them.`;
   return [feeling];
 }
 
@@ -97,9 +118,14 @@ export const adjustAffinity = internalMutation({
     const rel = await getRelationship(ctx.db, args.worldId, args.from, args.to);
     if (!rel) return;
     const delta = Math.max(-MAX_AFFINITY_CHANGE, Math.min(MAX_AFFINITY_CHANGE, args.delta));
-    await ctx.db.patch(rel._id, {
-      affinity: Math.max(-100, Math.min(100, rel.affinity + delta)),
-    });
+    const affinity = Math.max(-100, Math.min(100, rel.affinity + delta));
+    const minors = await minorIds(ctx.db, args.worldId);
+    const adults = !minors.has(args.from) && !minors.has(args.to);
+    // Fondness can turn into something more.
+    const crush =
+      adults &&
+      (rel.crush || (affinity >= CRUSH_DEVELOP_AFFINITY && Math.random() < CRUSH_DEVELOP_CHANCE));
+    await ctx.db.patch(rel._id, { affinity, crush });
   },
 });
 
@@ -136,3 +162,14 @@ export const characterMind = query({
     };
   },
 });
+
+// Player ids of everyone under ADULT_AGE.
+async function minorIds(db: DatabaseReader, worldId: Id<'worlds'>) {
+  const world = await db.get(worldId);
+  const day = world?.clock ? clockState(world.clock.elapsed).day : 0;
+  const rows = await db
+    .query('residents')
+    .withIndex('player', (q) => q.eq('worldId', worldId))
+    .collect();
+  return new Set(rows.filter((r) => ageOf(r, day) < ADULT_AGE).map((r) => r.playerId));
+}

@@ -148,7 +148,7 @@ async function generatePrayer(ctx: ActionCtx, prayer: Doc<'prayers'>) {
   const data = await ctx.runQuery(selfInternal.prayerPromptData, {
     worldId: prayer.worldId,
     playerId: prayer.playerId,
-    agentId: prayer.agentId,
+    agentId: prayer.agentId!,
   });
   const prompt = [
     `You are ${prayer.name}. ${data.identity}`,
@@ -413,6 +413,16 @@ export const rememberAnswer = internalAction({
         ? `${prayed} The god refused me, saying: "${prayer.godResponse}"`
         : `${prayed} I heard nothing back. Only silence.`;
     }
+    // A granted prayer changes something in the world.
+    if (prayer.status === 'accepted' && prayer.text) {
+      await ctx.scheduler.runAfter(0, internal.god.admin.grantPrayer, {
+        worldId: prayer.worldId,
+        name: prayer.name,
+        text: prayer.text,
+      });
+    }
+    // The player's own character remembers for themself.
+    if (!prayer.agentId) return;
     const { embedding } = await fetchEmbedding(description);
     await ctx.runMutation(internal.agent.memory.insertMemory, {
       agentId: prayer.agentId,

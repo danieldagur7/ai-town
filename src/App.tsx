@@ -10,10 +10,11 @@ import { useState } from 'react';
 import ReactModal from 'react-modal';
 import MusicButton from './components/buttons/MusicButton.tsx';
 import Button from './components/buttons/Button.tsx';
-import InteractButton from './components/buttons/InteractButton.tsx';
+import HeroMenu from './components/HeroMenu.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
 import ResourceBar from './components/ResourceBar.tsx';
+import TownNews from './components/TownNews.tsx';
 import GodMenu from './components/GodMenu.tsx';
 import PeopleMenu from './components/PeopleMenu.tsx';
 import { GodUiProvider } from './godUi.tsx';
@@ -83,7 +84,7 @@ export default function Home() {
           <Button href="https://github.com/a16z-infra/ai-town" imgUrl={starImg}>
             Star
           </Button>
-          <InteractButton />
+          <HeroMenu />
           <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
             Help
           </Button>
@@ -91,6 +92,7 @@ export default function Home() {
           <GodMenu />
           <ClockBadge />
           <ResourceBar />
+          <TownNews />
         </header>
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </main>

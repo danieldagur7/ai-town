@@ -9,9 +9,8 @@ import {
   GOD_SPEECH_MAX_RADIUS,
   PUNISH_STUN_DURATION,
   PUNISH_WITNESS_RADIUS,
-  STATUE_COST,
-  STATUE_WORK_NEEDED,
 } from '../constants';
+import { finishProject, setEra, startProject } from './project';
 import { parseGameId, playerId } from './ids';
 
 // God mode controls, sent from the God menu in the UI.
@@ -42,29 +41,28 @@ export const godModeInputs = {
       return r;
     },
   }),
-  // Start the statue on the plaza. Gathering isn't simulated yet, so the town
-  // is assumed to have collected the materials: the stockpile is topped up.
+  // Start the statue on the plaza (drawn in the god's image).
   startStatue: inputHandler({
     args: { name: v.optional(v.string()) },
     handler: (game, _now, args) => {
-      if (game.world.project && game.world.project.finishedDay === undefined) {
-        throw new Error('The town is already building something');
-      }
-      game.world.resources.wood = Math.max(game.world.resources.wood, STATUE_COST.wood);
-      game.world.resources.stone = Math.max(game.world.resources.stone, STATUE_COST.stone);
-      game.world.project = {
+      return startProject(game, {
         kind: 'statue',
         name: args.name?.trim() || 'a statue of the god',
-        work: 0,
-        workNeeded: STATUE_WORK_NEEDED,
-        cost: { ...STATUE_COST },
-        startedDay: game.world.clock ? clockState(game.world.clock.elapsed).day : 0,
-      };
-      game.scheduleOperation('considerTownMeeting', {
-        worldId: game.worldId,
-        reason: `The town has started building ${game.world.project.name} on the plaza.`,
       });
-      return null;
+    },
+  }),
+  // Build anything: the god's command, or a townsperson's proposal.
+  startProject: inputHandler({
+    args: { name: v.string(), subject: v.optional(v.string()), proposer: v.optional(v.string()) },
+    handler: (game, _now, args) => {
+      const name = args.name.trim();
+      if (!name) throw new Error('Say what to build');
+      return startProject(game, {
+        kind: 'building',
+        name,
+        subject: args.subject?.trim() || name,
+        proposer: args.proposer,
+      });
     },
   }),
   // Debug: add (or remove) work on the project, e.g. to see the later stages.
@@ -74,12 +72,36 @@ export const godModeInputs = {
       const project = game.world.project;
       if (!project) throw new Error('No project');
       project.work = Math.min(project.workNeeded, Math.max(0, project.work + args.shifts));
-      if (project.work >= project.workNeeded) {
-        project.finishedDay ??= game.world.clock ? clockState(game.world.clock.elapsed).day : 0;
-      } else {
-        delete project.finishedDay;
-      }
+      if (project.work >= project.workNeeded) finishProject(game);
       return null;
+    },
+  }),
+  cancelProject: inputHandler({
+    args: {},
+    handler: (game) => {
+      delete game.world.project;
+      for (const agent of game.world.agents.values()) delete agent.working;
+      return null;
+    },
+  }),
+  // Admin console: a visual effect on a building, found by (part of) its name.
+  structureEffect: inputHandler({
+    args: { name: v.string(), effect: v.string(), on: v.boolean() },
+    handler: (game, _now, args) => {
+      const want = args.name.toLowerCase().replace(/^(a|an|the)\s+/, '');
+      const s = game.world.structures.find((s) => s.name.toLowerCase().includes(want));
+      if (!s) throw new Error(`No building called ${args.name}`);
+      const effects = (s.effects ?? []).filter((e) => e !== args.effect);
+      if (args.on) effects.push(args.effect);
+      s.effects = effects;
+      return s.name;
+    },
+  }),
+  setEra: inputHandler({
+    args: { era: v.number() },
+    handler: (game, _now, args) => {
+      setEra(game, args.era);
+      return game.world.era;
     },
   }),
   // The manifested god speaks: everyone within `radius` tiles sees and hears it.

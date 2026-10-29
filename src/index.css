@@ -183,3 +183,7 @@ p[contenteditable='true']:empty::before {
 .shape-top-left-corner {
   clip-path: polygon(0 0, 100% 0, 0 100%);
 }
+
+.pixelated {
+  image-rendering: pixelated;
+}

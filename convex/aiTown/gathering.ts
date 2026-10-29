@@ -7,6 +7,7 @@ import { blocked, movePlayer, stopPlayer } from './movement';
 import { distance } from '../util/geometry';
 import { clockState, isSleepTime } from './clock';
 import { PLAZA } from '../../data/town';
+import { morningMeal } from './economy';
 import {
   GATHER_ARRIVE_TIMEOUT,
   GATHER_MESSAGE_GAP,
@@ -100,6 +101,16 @@ export function tickGatherings(game: Game, now: number) {
     game.scheduleOperation('considerTownMeeting', { worldId: game.worldId });
     // Make sure every pair of townspeople has a relationship (new characters, resets).
     game.scheduleOperation('seedRelationships', { worldId: game.worldId });
+  }
+  // Each morning: births and deaths, and if nothing is being built, someone
+  // proposes the next building.
+  if (clock && clock.phase === 'morning' && game.world.lastMorningDay !== clock.day) {
+    game.world.lastMorningDay = clock.day;
+    morningMeal(game);
+    game.scheduleOperation('lifeCycle', { worldId: game.worldId });
+    if (!game.world.project) {
+      game.scheduleOperation('proposeProject', { worldId: game.worldId });
+    }
   }
   for (const gathering of [...game.world.gatherings]) {
     // Drop anyone who has left the world.

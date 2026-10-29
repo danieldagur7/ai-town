@@ -28,7 +28,14 @@ import { playerGathering, tickGatheringMember } from './gathering';
 import { Player } from './player';
 import { BED_WALK_TIMEOUT } from '../constants';
 import { GOD_CHARACTER } from '../../data/characters';
-import { tickWorker } from './project';
+import { Job, tickWorker } from './project';
+
+const jobValidator = v.union(
+  v.literal('farm'),
+  v.literal('wood'),
+  v.literal('stone'),
+  v.literal('build'),
+);
 
 const SLEEPING = 'sleeping';
 
@@ -46,8 +53,10 @@ export class Agent {
   // Set when the agent starts heading to bed, cleared on waking.
   bedtimeStarted?: number;
   // Working on the town's project: walking to the site, or mid-shift.
-  working?: { walking: true } | { shiftStarted: number };
+  working?: { walking: true; job?: Job } | { shiftStarted: number; job?: Job };
   lastWorked?: number;
+  // Children don't work (kept up to date each morning from their ages).
+  child?: boolean;
 
   constructor(serialized: SerializedAgent) {
     const { id, lastConversation, lastInviteAttempt, inProgressOperation, bedtimeStarted } =
@@ -65,6 +74,7 @@ export class Agent {
     this.bedtimeStarted = bedtimeStarted;
     this.working = serialized.working;
     this.lastWorked = serialized.lastWorked;
+    this.child = serialized.child;
   }
 
   tick(game: Game, now: number) {
@@ -131,7 +141,7 @@ export class Agent {
     // If we have been wandering but haven't thought about something to do for
     // a while, do something.
     // Free time by day: maybe go work on the town's project instead.
-    if (!conversation && !doingActivity && tickWorker(game, now, this, player)) {
+    if (!conversation && !doingActivity && !this.child && tickWorker(game, now, this, player)) {
       return;
     }
     if (!conversation && !doingActivity && (!player.pathfinding || !recentlyAttemptedInvite)) {
@@ -406,6 +416,7 @@ export class Agent {
       bedtimeStarted: this.bedtimeStarted,
       working: this.working,
       lastWorked: this.lastWorked,
+      child: this.child,
     };
   }
 }
@@ -425,9 +436,13 @@ export const serializedAgent = {
   ),
   bedtimeStarted: v.optional(v.number()),
   working: v.optional(
-    v.union(v.object({ walking: v.literal(true) }), v.object({ shiftStarted: v.number() })),
+    v.union(
+      v.object({ walking: v.literal(true), job: v.optional(jobValidator) }),
+      v.object({ shiftStarted: v.number(), job: v.optional(jobValidator) }),
+    ),
   ),
   lastWorked: v.optional(v.number()),
+  child: v.optional(v.boolean()),
 };
 export type SerializedAgent = ObjectType<typeof serializedAgent>;
 
@@ -465,6 +480,30 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
       break;
     case 'rememberPunishment':
       reference = internal.god.punishment.rememberPunishment;
+      break;
+    case 'requestArt':
+      reference = internal.art.requestArt;
+      break;
+    case 'townEvent':
+      reference = internal.society.townEvent;
+      break;
+    case 'proposeProject':
+      reference = internal.society.proposeProject;
+      break;
+    case 'everyoneWellbeing':
+      reference = internal.life.changeEveryonesWellbeing;
+      break;
+    case 'heroEntered':
+      reference = internal.hero.heroEntered;
+      break;
+    case 'starve':
+      reference = internal.life.starve;
+      break;
+    case 'lifeCycle':
+      reference = internal.life.lifeCycle;
+      break;
+    case 'rememberLifeEvent':
+      reference = internal.life.rememberLifeEvent;
       break;
     default:
       throw new Error(`Unknown operation: ${operation}`);

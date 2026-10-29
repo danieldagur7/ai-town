@@ -41,8 +41,8 @@ export const AWKWARD_CONVERSATION_TIMEOUT = 60_000; // more time locally
 export const MAX_CONVERSATION_DURATION = 10 * 60_000; // more time locally
 // export const MAX_CONVERSATION_DURATION = 2 * 60_000;
 
-// Leave a conversation if it has more than 8 messages;
-export const MAX_CONVERSATION_MESSAGES = 8;
+// Leave a conversation if it has more than 6 messages;
+export const MAX_CONVERSATION_MESSAGES = 6;
 
 // Wait for 1s after sending an input to the engine. We can remove this
 // once we can await on an input being processed.
@@ -64,11 +64,21 @@ export const DELETE_BATCH_SIZE = 64;
 
 export const HUMAN_IDLE_TOO_LONG = 5 * 60 * 1000;
 
+// `risk` is the chance one go at it kills them; injuries are INJURY_FACTOR
+// times as likely. Risky ones are picked RISKY_ACTIVITY_CHANCE of the time, more
+// often by people whose wellbeing is low.
 export const ACTIVITIES = [
-  { description: 'reading a book', emoji: '📖', duration: 60_000 },
-  { description: 'daydreaming', emoji: '🤔', duration: 60_000 },
-  { description: 'gardening', emoji: '🥕', duration: 60_000 },
+  { description: 'reading a book', emoji: '📖', duration: 60_000, risk: 0 },
+  { description: 'daydreaming', emoji: '🤔', duration: 60_000, risk: 0 },
+  { description: 'gardening', emoji: '🥕', duration: 60_000, risk: 0 },
+  { description: 'fishing', emoji: '🎣', duration: 60_000, risk: 0 },
+  { description: 'hunting in the woods', emoji: '🏹', duration: 60_000, risk: 0.006 },
+  { description: 'climbing the cliffs', emoji: '🧗', duration: 60_000, risk: 0.008 },
+  { description: 'swimming in the cold lake', emoji: '🏊', duration: 60_000, risk: 0.004 },
+  { description: 'drinking alone', emoji: '🍺', duration: 60_000, risk: 0.002 },
 ];
+export const RISKY_ACTIVITY_CHANCE = 0.2;
+export const INJURY_FACTOR = 6;
 
 export const ENGINE_ACTION_DURATION = 30000;
 
@@ -167,3 +177,59 @@ export const WORK_REST = 30_000;
 export const WORK_SHIFT = 40_000;
 export const STATUE_WORK_NEEDED = 30;
 export const STATUE_COST = { wood: 30, stone: 60 };
+
+// Society progress. A regular building takes BUILDING_WORK_NEEDED shifts and
+// BUILDING_COST materials. After ERA_PROJECTS finished buildings in an era, the
+// town advances to the next one (see convex/aiTown/eras.ts).
+export const BUILDING_WORK_NEEDED = 12;
+export const BUILDING_COST = { wood: 15, stone: 20 };
+export const ERA_PROJECTS = 2;
+
+// Life and death. A game day ages everyone YEARS_PER_DAY years. Existing
+// townspeople start between START_AGE_MIN/MAX; everyone gets a lifespan between
+// LIFESPAN_MIN/MAX. Each morning: at most one death, and maybe one birth. The
+// town aims for POPULATION_TARGET people (births are likely below it, rare above)
+// and never exceeds MAX_POPULATION, with at most MAX_CHILDREN under ADULT_AGE.
+export const YEARS_PER_DAY = 2;
+export const START_AGE_MIN = 18;
+export const START_AGE_MAX = 50;
+export const LIFESPAN_MIN = 62;
+export const LIFESPAN_MAX = 98;
+export const POPULATION_TARGET = 6;
+export const MAX_POPULATION = 8;
+export const MAX_CHILDREN = 2;
+export const ADULT_AGE = 16;
+export const PARENT_AGE_MIN = 18;
+export const PARENT_AGE_MAX = 50;
+export const BIRTH_CHANCE_BELOW_TARGET = 0.7;
+export const BIRTH_CHANCE_AT_TARGET = 0.1;
+
+// Wellbeing (mental health) 0-100 per person. Conversations move it by half the
+// change in how they feel about the other person; life events move it more. It
+// drifts back toward WELLBEING_BASELINE by WELLBEING_DRIFT each morning.
+export const WELLBEING_START = 60;
+export const WELLBEING_BASELINE = 55;
+export const WELLBEING_DRIFT = 5;
+
+// Playing as yourself. A hero starts at HERO_START_AGE. Gathering takes
+// HERO_WORK_DURATION and brings in HERO_GATHER_AMOUNT; helping build adds
+// HERO_BUILD_WORK shifts of work.
+export const HERO_START_AGE = 20;
+export const HERO_WORK_DURATION = 15_000;
+export const HERO_GATHER_AMOUNT = 3;
+export const HERO_BUILD_WORK = 0.5;
+
+// When someone's affinity reaches CRUSH_DEVELOP_AFFINITY, each further warm
+// conversation has CRUSH_DEVELOP_CHANCE of turning it into a crush.
+export const CRUSH_DEVELOP_AFFINITY = 70;
+export const CRUSH_DEVELOP_CHANCE = 0.25;
+
+// Economy (plain game logic, no LLM). Each morning everyone eats FOOD_PER_PERSON
+// and the fields yield FIELD_YIELD each. A worker's shift brings in FARM_YIELD
+// food or GATHER_YIELD wood/stone. After STARVATION_DAYS hungry mornings in a
+// row, the weakest person dies.
+export const FOOD_PER_PERSON = 1;
+export const FIELD_YIELD = 1;
+export const FARM_YIELD = 3;
+export const GATHER_YIELD = 4;
+export const STARVATION_DAYS = 3;

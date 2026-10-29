@@ -21,6 +21,7 @@ export const Player = ({
   player,
   onClick,
   historicalTime,
+  effects,
 }: {
   game: ServerGame;
   isViewer: boolean;
@@ -28,6 +29,7 @@ export const Player = ({
 
   onClick: SelectElement;
   historicalTime?: number;
+  effects?: string[];
 }) => {
   const playerCharacter = game.playerDescriptions.get(player.id)?.character;
   if (!playerCharacter) {
@@ -85,6 +87,7 @@ export const Player = ({
         speed={character.speed}
         name={game.playerDescriptions.get(player.id)?.name}
         divine={divine}
+        effects={effects}
         onClick={() => {
           onClick({ kind: 'player', id: player.id });
         }}

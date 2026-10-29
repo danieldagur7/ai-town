@@ -13,6 +13,8 @@ import { assertNever } from '../util/assertNever';
 import { serializedAgent } from './agent';
 import {
   ACTIVITIES,
+  INJURY_FACTOR,
+  RISKY_ACTIVITY_CHANCE,
   ACTIVITY_COOLDOWN,
   CONVERSATION_COOLDOWN,
   GROUP_CHANCE,
@@ -137,7 +139,28 @@ export const agentDoSomething = internalAction({
         return;
       } else {
         // TODO: have LLM choose the activity & emoji
-        const activity = ACTIVITIES[Math.floor(Math.random() * ACTIVITIES.length)];
+        // Low spirits make people take more risks.
+        const wellbeing = await ctx.runQuery(internal.life.wellbeingOf, {
+          worldId: args.worldId,
+          playerId: player.id,
+        });
+        const riskyChance = RISKY_ACTIVITY_CHANCE * (wellbeing < 35 ? 2 : 1);
+        const pool = ACTIVITIES.filter((a) =>
+          Math.random() < riskyChance ? a.risk > 0 : a.risk === 0,
+        );
+        const activity = pool[Math.floor(Math.random() * pool.length)];
+        if (activity.risk > 0) {
+          const roll = Math.random();
+          if (roll < activity.risk * INJURY_FACTOR) {
+            // Something goes wrong, discovered when the activity ends.
+            await ctx.scheduler.runAfter(activity.duration, internal.life.accident, {
+              worldId: args.worldId,
+              playerId: player.id,
+              activity: activity.description,
+              fatal: roll < activity.risk,
+            });
+          }
+        }
         await sleep(Math.random() * 1000);
         await ctx.runMutation(api.aiTown.main.sendInput, {
           worldId: args.worldId,

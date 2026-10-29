@@ -19,9 +19,10 @@ export default function ResourceBar() {
       <span>🪵 {Math.floor(wood)}</span>
       <span>🪨 {Math.floor(stone)}</span>
       <span>🌾 {Math.floor(food)}</span>
-      {project && project.finishedDay === undefined && (
+      {project && (
         <span title={project.name}>
-          🗿 {Math.floor((100 * project.work) / project.workNeeded)}%
+          {project.kind === 'statue' ? '🗿' : '🏗️'}{' '}
+          {Math.floor((100 * project.work) / project.workNeeded)}%
         </span>
       )}
     </div>

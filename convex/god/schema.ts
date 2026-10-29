@@ -18,7 +18,8 @@ export const godTables = {
   prayers: defineTable({
     worldId: v.id('worlds'),
     playerId,
-    agentId,
+    // Missing for prayers the player's own character writes.
+    agentId: v.optional(agentId),
     name: v.string(),
     night: v.number(),
     status: prayerStatus,

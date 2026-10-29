@@ -16,7 +16,7 @@ import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
 import { GameId } from '../../convex/aiTown/ids.ts';
 import { Beds } from './Beds.tsx';
-import { ProjectSite } from './Project.tsx';
+import { EraHouses, ProjectSite, Structures } from './Project.tsx';
 import { Smite, SpeechPulse, SpeechRadius } from './GodSpeech.tsx';
 import { GOD_CHARACTER } from '../../data/characters.ts';
 
@@ -36,6 +36,8 @@ export const PixiGame = (props: {
   const viewportRef = useRef<Viewport | undefined>();
 
   const humanTokenIdentifier = useQuery(api.world.userStatus, { worldId: props.worldId }) ?? null;
+  const art = useQuery(api.art.artByKey, { worldId: props.worldId });
+  const effects = useQuery(api.god.admin.characterEffects, { worldId: props.worldId });
   const humanPlayerId = [...props.game.world.players.values()].find(
     (p) => p.human === humanTokenIdentifier,
   )?.id;
@@ -135,6 +137,8 @@ export const PixiGame = (props: {
         onpointerdown={onMapPointerDown}
       />
       <Beds tileDim={tileDim} />
+      <EraHouses era={props.game.world.era} art={art} tileDim={tileDim} />
+      <Structures structures={props.game.world.structures} art={art} tileDim={tileDim} />
       {props.game.world.project && (
         <ProjectSite project={props.game.world.project} tileDim={tileDim} />
       )}
@@ -166,6 +170,7 @@ export const PixiGame = (props: {
           isViewer={p.id === humanPlayerId}
           onClick={props.setSelectedElement}
           historicalTime={props.historicalTime}
+          effects={effects?.[p.id]}
         />
       ))}
     </PixiViewport>

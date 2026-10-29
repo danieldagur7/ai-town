@@ -272,9 +272,25 @@ export const playerInputs = {
       character: v.string(),
       description: v.string(),
       tokenIdentifier: v.optional(v.string()),
+      // Set when joining as the player's own character (convex/hero.ts).
+      heroId: v.optional(v.id('heroes')),
     },
     handler: (game, now, args) => {
-      Player.join(game, now, args.name, args.character, args.description, args.tokenIdentifier);
+      const id = Player.join(
+        game,
+        now,
+        args.name,
+        args.character,
+        args.description,
+        args.tokenIdentifier,
+      );
+      if (args.heroId) {
+        game.scheduleOperation('heroEntered', {
+          worldId: game.worldId,
+          heroId: args.heroId,
+          playerId: id,
+        });
+      }
       return null;
     },
   }),

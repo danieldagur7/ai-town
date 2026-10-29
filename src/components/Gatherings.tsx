@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useMutation } from 'convex/react';
+import { toastOnError } from '../toasts';
+import { useSendInput } from '../hooks/sendInput';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
@@ -69,6 +72,63 @@ function GatheringCard({
           {status && <p className="italic text-brown-700">{status}</p>}
         </div>
       )}
+      <HeroInGathering worldId={worldId} game={game} gathering={gathering} />
+    </div>
+  );
+}
+
+// Playing as my own character: join the gathering, speak up, or leave.
+function HeroInGathering({
+  worldId,
+  game,
+  gathering,
+}: {
+  worldId: Id<'worlds'>;
+  game: ServerGame;
+  gathering: ServerGame['world']['gatherings'][number];
+}) {
+  const mine = useQuery(api.hero.myHero, { worldId });
+  const worldStatus = useQuery(api.world.defaultWorldStatus);
+  const join = useSendInput(worldStatus?.engineId as Id<'engines'>, 'joinGathering');
+  const leave = useSendInput(worldStatus?.engineId as Id<'engines'>, 'leaveGathering');
+  const say = useMutation(api.hero.sayInGathering);
+  const [text, setText] = useState('');
+  const me = mine?.hero?.playerId;
+  if (!me || !game.world.players.has(me as any)) return null;
+  const joined = gathering.participants.includes(me);
+  if (!joined) {
+    return (
+      <button
+        className="w-full bg-clay-700 text-white text-sm py-1"
+        onClick={() => void toastOnError(join({ playerId: me, gatheringId: gathering.id }))}
+      >
+        Join as {mine!.hero!.name}
+      </button>
+    );
+  }
+  const send = () => {
+    if (!text.trim()) return;
+    void toastOnError(say({ worldId, gatheringId: gathering.id, text }));
+    setText('');
+  };
+  return (
+    <div className="flex gap-1 p-1">
+      <input
+        className="flex-1 text-sm text-black bg-white px-2"
+        placeholder="Say something…"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && send()}
+      />
+      <button className="bg-clay-700 text-white text-xs px-2" onClick={send}>
+        Say
+      </button>
+      <button
+        className="bg-brown-900 text-white text-xs px-2"
+        onClick={() => void toastOnError(leave({ playerId: me }))}
+      >
+        Leave
+      </button>
     </div>
   );
 }

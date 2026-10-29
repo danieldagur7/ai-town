@@ -14,7 +14,9 @@ import { insertInput } from '../aiTown/insertInput';
 import { clockState, formatClock } from '../aiTown/clock';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
 import { punishmentPrompt } from '../god/punishment';
-import { projectPrompt } from '../aiTown/project';
+import { townPrompt } from '../aiTown/project';
+import { ageLine, residentAge, residentMood, wellbeingLine } from '../life';
+import { traitsPrompt } from '../god/admin';
 import { faithDescription } from '../god/faith';
 import { cleanMessage } from './conversation';
 import { MESSAGE_MAX_TOKENS } from '../constants';
@@ -121,13 +123,17 @@ export const gatheringPromptData = internalQuery({
       topic: gathering.topic,
       callerName: await nameOf(gathering.caller),
       name: await nameOf(args.playerId),
-      identity: description?.identity ?? '',
+      identity:
+        (description?.identity ?? '') +
+        ageLine(await residentAge(ctx.db, args.worldId, args.playerId, clock?.day ?? 0)) +
+        wellbeingLine(await residentMood(ctx.db, args.worldId, args.playerId)) +
+        (await traitsPrompt(ctx.db, args.worldId, args.playerId)),
       faith: faith?.score,
       others,
       transcript,
       decrees: (await activeDecrees(ctx.db, args.worldId)).map((d) => d.text),
       punishments: await punishmentPrompt(ctx.db, args.worldId, args.playerId),
-      timeOfDay: (clock ? `It's ${clock.phase} (${formatClock(clock)}).` : '') + projectPrompt(world.project),
+      timeOfDay: (clock ? `It's ${clock.phase} (${formatClock(clock)}).` : '') + townPrompt(world),
     };
   },
 });

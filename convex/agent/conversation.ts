@@ -12,7 +12,9 @@ import { faithDescription } from '../god/faith';
 import { GOD_CHARACTER } from '../../data/characters';
 import { activeDecrees, decreesPrompt } from '../god/decrees';
 import { punishmentPrompt } from '../god/punishment';
-import { projectPrompt } from '../aiTown/project';
+import { townPrompt } from '../aiTown/project';
+import { ageLine, residentAge, residentMood, wellbeingLine } from '../life';
+import { traitsPrompt } from '../god/admin';
 import { getRelationship, relationshipPrompt } from './relationships';
 
 const selfInternal = internal.agent.conversation;
@@ -20,7 +22,10 @@ const selfInternal = internal.agent.conversation;
 // Keep chat snappy: short spoken lines, no narration.
 const CHAT_STYLE =
   'Reply with one or two short sentences (under 25 words), like natural spoken chat. ' +
-  'No narration, no actions in asterisks or parentheses, no quotation marks.';
+  'No narration, no actions in asterisks or parentheses, no quotation marks. ' +
+  'Be true to how you feel, like a real person: warm with people you like; cold, sarcastic, ' +
+  'petty or even cruel with people you dislike. People gossip, hold grudges, apologize and ' +
+  'make up. Keep it realistic, not melodramatic.';
 
 // Strips stage directions and stray formatting the model adds despite CHAT_STYLE.
 export function cleanMessage(text: string) {
@@ -408,10 +413,16 @@ export const queryPromptData = internalQuery({
       args.otherPlayerId,
     );
     const clock = world.clock && clockState(world.clock.elapsed);
+    const day = clock?.day ?? 0;
+    const myAge =
+      ageLine(await residentAge(ctx.db, args.worldId, args.playerId, day)) +
+      wellbeingLine(await residentMood(ctx.db, args.worldId, args.playerId)) +
+      (await traitsPrompt(ctx.db, args.worldId, args.playerId));
+    const otherAge = await residentAge(ctx.db, args.worldId, args.otherPlayerId, day);
     const timeOfDay =
       (clock
         ? `It's ${clock.phase} (${formatClock(clock)}) on day ${clock.day}.`
-        : `It's daytime.`) + projectPrompt(world.project);
+        : `It's daytime.`) + townPrompt(world);
     return {
       player: { name: playerDescription.name, ...player },
       otherPlayer: {
@@ -421,13 +432,15 @@ export const queryPromptData = internalQuery({
       },
       conversation,
       agent: {
-        identity: agentDescription.identity,
+        identity: agentDescription.identity + myAge,
         plan: agentDescription.plan,
         faith: faith?.score,
         ...agent,
       },
       otherAgent: otherAgent && {
-        identity: otherAgentDescription!.identity,
+        identity:
+          otherAgentDescription!.identity +
+          (otherAge !== undefined ? ` They are ${otherAge} years old.` : ''),
         plan: otherAgentDescription!.plan,
         ...otherAgent,
       },

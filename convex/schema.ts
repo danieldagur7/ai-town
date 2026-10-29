@@ -5,6 +5,11 @@ import { aiTownTables } from './aiTown/schema';
 import { conversationId, playerId } from './aiTown/ids';
 import { engineTables } from './engine/schema';
 import { godTables } from './god/schema';
+import { artTables } from './art';
+import { societyTables } from './society';
+import { lifeTables } from './life';
+import { adminTables } from './god/admin';
+import { heroTables } from './hero';
 
 export default defineSchema({
   music: defineTable({
@@ -26,4 +31,9 @@ export default defineSchema({
   ...aiTownTables,
   ...engineTables,
   ...godTables,
+  ...artTables,
+  ...societyTables,
+  ...lifeTables,
+  ...adminTables,
+  ...heroTables,
 });

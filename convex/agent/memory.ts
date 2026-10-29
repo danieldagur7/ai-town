@@ -45,35 +45,46 @@ export async function rememberConversation(
     return;
   }
 
-  const llmMessages: LLMMessage[] = [
-    {
-      role: 'user',
-      content: `You are ${player.name}, and you just finished a conversation with ${otherPlayer.name}. I would
-      like you to summarize the conversation from ${player.name}'s perspective, using first-person pronouns like
-      "I," and add if you liked or disliked this interaction. Keep it to two or three sentences.`,
-    },
-  ];
+  // One call does the summary, its importance and the change in feelings
+  // (these used to be three calls per participant).
   const authors = new Set<GameId<'players'>>();
   const transcript = [];
   for (const message of messages) {
     const author = message.author === player.id ? player : otherPlayer;
     authors.add(author.id as GameId<'players'>);
     transcript.push({ author: author.name, text: message.text });
-    const recipient = message.author === player.id ? otherPlayer : player;
-    llmMessages.push({
-      role: 'user',
-      content: `${author.name} to ${recipient.name}: ${message.text}`,
-    });
   }
-  llmMessages.push({ role: 'user', content: 'Summary:' });
-  const { content } = await chatCompletion({
-    messages: llmMessages,
-    max_tokens: 150,
-  });
+  const { content: raw } = await chatCompletion({
+    messages: [
+      {
+        role: 'user',
+        content:
+          `${player.name} just had this conversation with ${otherPlayer.name}:\n` +
+          transcript.map((m) => `${m.author}: ${m.text}`).join('\n') +
+          `\n\nReply with JSON only: {"summary": "<two or three sentences from ${player.name}'s ` +
+          `point of view, first person, saying whether they liked the interaction>", ` +
+          `"importance": <0 (mundane) to 9 (life-changing)>, "feeling_change": <-10 (made ` +
+          `${player.name} like ${otherPlayer.name} much less) to 10 (much more)>}`,
+      },
+    ],
+    max_tokens: 220,
+    temperature: 0.3,
+    response_format: { type: 'json_object' },
+  } as any);
+  let content = raw.trim();
+  let importance = 3;
+  let delta = 0;
+  try {
+    const parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+    content = String(parsed.summary ?? content);
+    importance = Math.max(0, Math.min(9, Number(parsed.importance) || 0));
+    delta = Math.round(Number(parsed.feeling_change) || 0);
+  } catch {
+    console.error(`Couldn't parse memory JSON: ${raw}`);
+  }
   const description = `Conversation with ${otherPlayer.name} at ${new Date(
     data.conversation._creationTime,
   ).toLocaleString()}: ${content}`;
-  const importance = await calculateImportance(description);
   const { embedding } = await fetchEmbedding(description);
   authors.delete(player.id as GameId<'players'>);
   await ctx.runMutation(selfInternal.insertMemory, {
@@ -97,27 +108,17 @@ export async function rememberConversation(
     otherName: otherPlayer.name,
     transcript,
   });
-  // How did this conversation change how they feel about the other person?
-  const { content: moodRaw } = await chatCompletion({
-    messages: [
-      {
-        role: 'user',
-        content:
-          `${player.name} just had this conversation with ${otherPlayer.name}: ${content}\n` +
-          `On a scale from -10 (it made ${player.name} like them much less) to 10 (much more), ` +
-          `how did it change ${player.name}'s feelings about ${otherPlayer.name}? Reply with the number only.`,
-      },
-    ],
-    temperature: 0.0,
-    max_tokens: 3,
-  });
-  const delta = parseInt(moodRaw.match(/-?\d+/)?.[0] ?? '0', 10);
   if (!isNaN(delta) && delta !== 0) {
     await ctx.runMutation(internal.agent.relationships.adjustAffinity, {
       worldId,
       from: player.id,
       to: otherPlayer.id,
       delta,
+    });
+    await ctx.runMutation(internal.life.changeWellbeing, {
+      worldId,
+      playerId: player.id,
+      delta: Math.round(delta / 2),
     });
   }
   await reflectOnMemories(ctx, worldId, playerId);

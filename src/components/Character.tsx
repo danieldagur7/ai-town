@@ -18,6 +18,7 @@ export const Character = ({
   speed = 0.1,
   name,
   divine = false,
+  effects = [],
   onClick,
 }: {
   // Path to the texture packed image.
@@ -42,6 +43,8 @@ export const Character = ({
   name?: string;
   // The god's manifested form: recolored robe, halo and glow.
   divine?: boolean;
+  // Admin-console effects: glow, sparkle, giant, tiny.
+  effects?: string[];
   onClick: () => void;
 }) => {
   const [spriteSheet, setSpriteSheet] = useState<Spritesheet>();
@@ -95,6 +98,7 @@ export const Character = ({
     <Container
       x={x}
       y={y}
+      scale={effects.includes('giant') ? 2 : effects.includes('tiny') ? 0.6 : 1}
       interactive={true}
       pointerdown={onClick}
       pointerover={() => setHovered(true)}
@@ -110,7 +114,7 @@ export const Character = ({
         <Text x={18} y={-10} scale={0.8} text={'💬'} anchor={{ x: 0.5, y: 0.5 }} />
       )}
       {isViewer && <ViewerIndicator />}
-      {divine && <DivineGlow />}
+      {(divine || effects.includes('glow')) && <DivineGlow />}
       <AnimatedSprite
         ref={ref}
         isPlaying={isMoving}
@@ -121,7 +125,7 @@ export const Character = ({
       {emoji && (
         <Text x={0} y={-24} scale={{ x: -0.8, y: 0.8 }} text={emoji} anchor={{ x: 0.5, y: 0.5 }} />
       )}
-      {divine && <Halo />}
+      {(divine || effects.includes('sparkle')) && <Halo />}
       {hovered && name && <NameLabel name={name} y={emoji ? -40 : -26} />}
     </Container>
   );

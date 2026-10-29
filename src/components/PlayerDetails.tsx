@@ -233,6 +233,7 @@ export default function PlayerDetails({
       )}
       <div className="desc my-6">
         <p className="leading-tight -m-4 bg-brown-700 text-base sm:text-sm">
+          {!isMe && <AgeLine worldId={worldId} playerId={player.id} game={game} />}
           {!isMe && playerDescription?.description}
           {isMe && <i>This is you!</i>}
           {!isMe && inConversationWithMe && (
@@ -271,4 +272,36 @@ export default function PlayerDetails({
       )}
     </>
   );
+}
+
+// "Age 34 · child of Alice and Lucky"
+function AgeLine({
+  worldId,
+  playerId,
+  game,
+}: {
+  worldId: Id<'worlds'>;
+  playerId: GameId<'players'>;
+  game: ServerGame;
+}) {
+  const ages = useQuery(api.life.ages, { worldId });
+  const info = ages?.[playerId];
+  if (!info) return null;
+  const parents = info.parents.map(
+    (id) => game.playerDescriptions.get(id as GameId<'players'>)?.name ?? '?',
+  );
+  return (
+    <b className="block mb-2">
+      Age {info.age} · {moodLabel(info.wellbeing)}
+      {parents.length === 2 && ` · child of ${parents[0]} and ${parents[1]}`}
+    </b>
+  );
+}
+
+function moodLabel(w: number) {
+  if (w < 20) return '😞 in a dark place';
+  if (w < 40) return '😕 feeling low';
+  if (w > 85) return '😄 thriving';
+  if (w > 70) return '🙂 doing well';
+  return '😐 okay';
 }

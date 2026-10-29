@@ -34,6 +34,11 @@ export const rememberPunishment = internalAction({
     witnesses: v.array(v.object({ playerId, agentId })),
   },
   handler: async (ctx, args) => {
+    await ctx.runMutation(internal.life.changeWellbeing, {
+      worldId: args.worldId,
+      playerId: args.playerId,
+      delta: -15,
+    });
     const punishmentId = await ctx.runMutation(internal.god.punishment.recordPunishment, {
       worldId: args.worldId,
       playerId: args.playerId,

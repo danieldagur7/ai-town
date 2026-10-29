@@ -7,7 +7,7 @@ import { parseMap } from '../util/object';
 import { Clock, serializedClock } from './clock';
 import { Gathering, serializedGathering } from './gathering';
 import { START_RESOURCES } from '../constants';
-import { Project, serializedProject } from './project';
+import { Project, Structure, serializedProject, serializedStructure } from './project';
 
 export const historicalLocations = v.array(
   v.object({
@@ -29,8 +29,14 @@ export const serializedWorld = {
   gatherings: v.optional(v.array(serializedGathering)),
   lastMeetingDay: v.optional(v.number()),
   lastMeetingCheckDay: v.optional(v.number()),
+  lastMorningDay: v.optional(v.number()),
+  // Mornings in a row without enough food.
+  hungryDays: v.optional(v.number()),
   // The town's building project (the statue), in progress or finished.
   project: v.optional(serializedProject),
+  // Finished buildings, and the era the town is in (index into ERAS).
+  structures: v.optional(v.array(serializedStructure)),
+  era: v.optional(v.number()),
   // Where and when the god last struck someone with lightning, for the UI.
   godSmite: v.optional(v.object({ x: v.number(), y: v.number(), time: v.number() })),
   // Where and when the manifested god last spoke to the town, for the UI pulse.
@@ -53,7 +59,11 @@ export class World {
   resources: { wood: number; stone: number; food: number };
   lastMeetingDay?: number;
   lastMeetingCheckDay?: number;
+  lastMorningDay?: number;
+  hungryDays?: number;
   project?: Project;
+  structures: Structure[];
+  era: number;
 
   constructor(serialized: SerializedWorld) {
     const { nextId, historicalLocations, clock, godSpeech, godSmite } = serialized;
@@ -66,7 +76,11 @@ export class World {
     this.resources = serialized.resources ?? { ...START_RESOURCES };
     this.lastMeetingDay = serialized.lastMeetingDay;
     this.lastMeetingCheckDay = serialized.lastMeetingCheckDay;
+    this.lastMorningDay = serialized.lastMorningDay;
+    this.hungryDays = serialized.hungryDays;
     this.project = serialized.project;
+    this.structures = serialized.structures ?? [];
+    this.era = serialized.era ?? 0;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
     this.players = parseMap(serialized.players, Player, (p) => p.id);
     this.agents = parseMap(serialized.agents, Agent, (a) => a.id);
@@ -102,7 +116,11 @@ export class World {
       resources: this.resources,
       lastMeetingDay: this.lastMeetingDay,
       lastMeetingCheckDay: this.lastMeetingCheckDay,
+      lastMorningDay: this.lastMorningDay,
+      hungryDays: this.hungryDays,
       project: this.project,
+      structures: this.structures,
+      era: this.era,
     };
   }
 }
