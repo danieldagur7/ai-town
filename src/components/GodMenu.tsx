@@ -62,6 +62,7 @@ function GodMenuPanel({
       <Decrees worldId={worldId} engineId={engineId} />
       <MeetingSummaries worldId={worldId} />
       <FaithScores worldId={worldId} />
+      <TownDebug engineId={engineId} />
       <section className="flex flex-col gap-2">
         <h3 className="text-xl">Time</h3>
         <Button
@@ -487,6 +488,46 @@ function PrayerCard({
         </button>
       </div>
     </div>
+  );
+}
+
+// Debug: set the town's stockpile directly, to test without waiting.
+function TownDebug({ engineId }: { engineId: Id<'engines'> }) {
+  const setResources = useSendInput(engineId, 'setResources');
+  const [values, setValues] = useState({ wood: '', stone: '', food: '' });
+  const apply = () => {
+    const args: { wood?: number; stone?: number; food?: number } = {};
+    for (const key of ['wood', 'stone', 'food'] as const) {
+      if (values[key] !== '') args[key] = Number(values[key]);
+    }
+    void toastOnError(setResources(args));
+    setValues({ wood: '', stone: '', food: '' });
+  };
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-xl">Town (debug)</h3>
+      <div className="flex gap-1">
+        {(
+          [
+            ['wood', '🪵'],
+            ['stone', '🪨'],
+            ['food', '🌾'],
+          ] as const
+        ).map(([key, icon]) => (
+          <input
+            key={key}
+            className="w-1/3 text-sm text-black bg-white p-1"
+            type="number"
+            placeholder={`${icon} set`}
+            value={values[key]}
+            onChange={(e) => setValues({ ...values, [key]: e.target.value })}
+          />
+        ))}
+      </div>
+      <button className="bg-clay-700 text-white text-sm py-1" onClick={apply}>
+        Set stockpile
+      </button>
+    </section>
   );
 }
 

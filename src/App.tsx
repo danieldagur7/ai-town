@@ -13,6 +13,7 @@ import Button from './components/buttons/Button.tsx';
 import InteractButton from './components/buttons/InteractButton.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
+import ResourceBar from './components/ResourceBar.tsx';
 import GodMenu from './components/GodMenu.tsx';
 import PeopleMenu from './components/PeopleMenu.tsx';
 import { GodUiProvider } from './godUi.tsx';
@@ -89,6 +90,7 @@ export default function Home() {
           <PeopleMenu />
           <GodMenu />
           <ClockBadge />
+          <ResourceBar />
         </header>
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </main>

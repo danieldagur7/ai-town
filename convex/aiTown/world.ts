@@ -6,6 +6,7 @@ import { GameId, parseGameId, playerId } from './ids';
 import { parseMap } from '../util/object';
 import { Clock, serializedClock } from './clock';
 import { Gathering, serializedGathering } from './gathering';
+import { START_RESOURCES } from '../constants';
 
 export const historicalLocations = v.array(
   v.object({
@@ -21,6 +22,8 @@ export const serializedWorld = {
   agents: v.array(v.object(serializedAgent)),
   historicalLocations: v.optional(historicalLocations),
   clock: v.optional(serializedClock),
+  // The town's shared stockpile.
+  resources: v.optional(v.object({ wood: v.number(), stone: v.number(), food: v.number() })),
   // Group conversations and town meetings in progress.
   gatherings: v.optional(v.array(serializedGathering)),
   lastMeetingDay: v.optional(v.number()),
@@ -44,6 +47,7 @@ export class World {
   godSpeech?: { x: number; y: number; radius: number; time: number };
   godSmite?: { x: number; y: number; time: number };
   gatherings: Gathering[];
+  resources: { wood: number; stone: number; food: number };
   lastMeetingDay?: number;
   lastMeetingCheckDay?: number;
 
@@ -55,6 +59,7 @@ export class World {
     this.godSpeech = godSpeech;
     this.godSmite = godSmite;
     this.gatherings = serialized.gatherings ?? [];
+    this.resources = serialized.resources ?? { ...START_RESOURCES };
     this.lastMeetingDay = serialized.lastMeetingDay;
     this.lastMeetingCheckDay = serialized.lastMeetingCheckDay;
     this.conversations = parseMap(serialized.conversations, Conversation, (c) => c.id);
@@ -89,6 +94,7 @@ export class World {
       godSpeech: this.godSpeech,
       godSmite: this.godSmite,
       gatherings: this.gatherings,
+      resources: this.resources,
       lastMeetingDay: this.lastMeetingDay,
       lastMeetingCheckDay: this.lastMeetingCheckDay,
     };

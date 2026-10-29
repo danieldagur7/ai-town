@@ -24,6 +24,22 @@ export const godModeInputs = {
       return clockState(clock.elapsed).phase;
     },
   }),
+  // Debug: set the town's stockpile directly.
+  setResources: inputHandler({
+    args: {
+      wood: v.optional(v.number()),
+      stone: v.optional(v.number()),
+      food: v.optional(v.number()),
+    },
+    handler: (game, _now, args) => {
+      const r = game.world.resources;
+      for (const key of ['wood', 'stone', 'food'] as const) {
+        const value = args[key];
+        if (value !== undefined) r[key] = Math.max(0, Math.round(value));
+      }
+      return r;
+    },
+  }),
   // The manifested god speaks: everyone within `radius` tiles sees and hears it.
   godSpeaks: inputHandler({
     args: { words: v.string(), radius: v.number() },
