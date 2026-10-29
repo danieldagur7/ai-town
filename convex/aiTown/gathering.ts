@@ -5,7 +5,7 @@ import { inputHandler } from './inputHandler';
 import { Player } from './player';
 import { blocked, movePlayer, stopPlayer } from './movement';
 import { distance } from '../util/geometry';
-import { clockState, isSleepTime, isWindDown } from './clock';
+import { clockState, isSleepTime } from './clock';
 import { PLAZA } from '../../data/town';
 import {
   GATHER_ARRIVE_TIMEOUT,
@@ -108,7 +108,6 @@ export function tickGatherings(game: Game, now: number) {
     if (
       gathering.participants.length < 2 ||
       isSleepTime(game.world) ||
-      isWindDown(game.world) ||
       (gathering.numMessages >= max && !gathering.speaking)
     ) {
       end(game, gathering);
@@ -142,7 +141,14 @@ export function tickGatherings(game: Game, now: number) {
     if (gathering.lastMessage && now < gathering.lastMessage.timestamp + GATHER_MESSAGE_GAP) {
       continue;
     }
-    // The caller opens; after that, anyone present except whoever spoke last.
+    // The caller opens (waiting for them if they're here but busy); after that,
+    // anyone present except whoever spoke last.
+    if (gathering.numMessages === 0 && here.includes(gathering.caller)) {
+      const caller = [...game.world.agents.values()].find((a) => a.playerId === gathering.caller);
+      if (caller?.inProgressOperation) {
+        continue;
+      }
+    }
     const candidates = here.filter((id) => {
       const agent = [...game.world.agents.values()].find((a) => a.playerId === id);
       return agent && !agent.inProgressOperation && id !== gathering.lastMessage?.author;
