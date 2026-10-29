@@ -9,6 +9,7 @@ import {
   AWKWARD_CONVERSATION_TIMEOUT,
   CONVERSATION_COOLDOWN,
   CONVERSATION_DISTANCE,
+  IDLE_WORLD_TIMEOUT,
   INVITE_ACCEPT_PROBABILITY,
   INVITE_TIMEOUT,
   MAX_CONVERSATION_DURATION,
@@ -552,8 +553,16 @@ export const findConversationCandidate = internalQuery({
   handler: async (ctx, { now, worldId, player, otherFreePlayers }) => {
     const { position } = player;
     const candidates = [];
+    // Running on autorun with nobody watching: the player's character can't
+    // answer, so don't invite them (the invite would just hang until it times out).
+    const worldStatus = await ctx.db
+      .query('worldStatus')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId))
+      .first();
+    const watched = !!worldStatus && worldStatus.lastViewed > now - IDLE_WORLD_TIMEOUT;
 
     for (const otherPlayer of otherFreePlayers) {
+      if (otherPlayer.human && !watched) continue;
       // Find the latest conversation we're both members of.
       const lastMember = await ctx.db
         .query('participatedTogether')

@@ -56,12 +56,34 @@ export const heartbeatWorld = mutation({
   },
 });
 
+// Autorun: the town carries on in the background without an open tab (the
+// computer and the local backend still have to be running).
+export const setAutorun = mutation({
+  args: { worldId: v.id('worlds'), autorun: v.boolean() },
+  handler: async (ctx, { worldId, autorun }) => {
+    const worldStatus = await ctx.db
+      .query('worldStatus')
+      .withIndex('worldId', (q) => q.eq('worldId', worldId))
+      .first();
+    if (!worldStatus) throw new Error(`Invalid world ID: ${worldId}`);
+    await ctx.db.patch(worldStatus._id, { autorun });
+    if (autorun && worldStatus.status === 'inactive') {
+      await ctx.db.patch(worldStatus._id, { status: 'running' });
+      await startEngine(ctx, worldId);
+    }
+  },
+});
+
 export const stopInactiveWorlds = internalMutation({
   handler: async (ctx) => {
     const cutoff = Date.now() - IDLE_WORLD_TIMEOUT;
     const worlds = await ctx.db.query('worldStatus').collect();
     for (const worldStatus of worlds) {
-      if (cutoff < worldStatus.lastViewed || worldStatus.status !== 'running') {
+      if (
+        worldStatus.autorun ||
+        cutoff < worldStatus.lastViewed ||
+        worldStatus.status !== 'running'
+      ) {
         continue;
       }
       console.log(`Stopping inactive world ${worldStatus._id}`);

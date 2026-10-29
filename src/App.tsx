@@ -1,7 +1,6 @@
 import Game from './components/Game.tsx';
 
 import { ToastContainer } from 'react-toastify';
-import starImg from '../assets/star.svg';
 import helpImg from '../assets/help.svg';
 // import { UserButton } from '@clerk/clerk-react';
 // import { Authenticated, Unauthenticated } from 'convex/react';
@@ -12,6 +11,7 @@ import MusicButton from './components/buttons/MusicButton.tsx';
 import Button from './components/buttons/Button.tsx';
 import HeroMenu from './components/HeroMenu.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
+import AutorunButton from './components/AutorunButton.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
 import ResourceBar from './components/ResourceBar.tsx';
 import TownNews from './components/TownNews.tsx';
@@ -34,8 +34,8 @@ export default function Home() {
           <div className="font-body">
             <h1 className="text-center text-6xl font-bold font-display game-title">Help</h1>
             <p>
-              Welcome to AI town: a little society that grows, loves, fights, builds and dies on
-              its own, with you as its god, as one of its people, or both.
+              Welcome to AI town: a little society that grows, loves, fights, builds and dies on its
+              own, with you as its god, as one of its people, or both.
             </p>
             <h2 className="text-4xl mt-4">Watching</h2>
             <p>
@@ -75,9 +75,7 @@ export default function Home() {
         <header className="absolute top-0 left-0 z-10 flex flex-wrap items-center gap-3 p-3 pointer-events-none">
           <FreezeButton />
           <MusicButton />
-          <Button href="https://github.com/a16z-infra/ai-town" imgUrl={starImg}>
-            Star
-          </Button>
+          <AutorunButton />
           <HeroMenu />
           <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
             Help
