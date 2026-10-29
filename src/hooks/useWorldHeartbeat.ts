@@ -11,7 +11,8 @@ export function useWorldHeartbeat() {
   const heartbeat = useMutation(api.world.heartbeatWorld);
   useEffect(() => {
     const sendHeartBeat = () => {
-      if (!worldStatus) {
+      // Only a visible tab keeps the world running.
+      if (!worldStatus || document.visibilityState !== 'visible') {
         return;
       }
       // Don't send a heartbeat if we've observed one sufficiently close
@@ -23,7 +24,17 @@ export function useWorldHeartbeat() {
     };
     sendHeartBeat();
     const id = setInterval(sendHeartBeat, WORLD_HEARTBEAT_INTERVAL);
-    return () => clearInterval(id);
+    // Coming back to the tab wakes the world straight away.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && worldStatus) {
+        void heartbeat({ worldId: worldStatus.worldId });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
     // Rerun if the `worldId` changes but not `worldStatus`, since don't want to
     // resend the heartbeat whenever its last viewed timestamp changes.
   }, [worldId, heartbeat]);

@@ -9,7 +9,7 @@ const crons = cronJobs();
 
 crons.interval(
   'stop inactive worlds',
-  { seconds: IDLE_WORLD_TIMEOUT / 1000 },
+  { seconds: Math.max(15, IDLE_WORLD_TIMEOUT / 3000) },
   internal.world.stopInactiveWorlds,
 );
 

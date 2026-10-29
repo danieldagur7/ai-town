@@ -1,8 +1,11 @@
 export const ACTION_TIMEOUT = 120_000; // more time for local dev
 // export const ACTION_TIMEOUT = 60_000;// normally fine
 
-export const IDLE_WORLD_TIMEOUT = 5 * 60 * 1000;
-export const WORLD_HEARTBEAT_INTERVAL = 60 * 1000;
+// The world pauses this long after the last heartbeat. Pages only send
+// heartbeats while their tab is visible, so hiding or closing the tab pauses
+// the world (and the LLM work) within about a minute.
+export const IDLE_WORLD_TIMEOUT = 45 * 1000;
+export const WORLD_HEARTBEAT_INTERVAL = 15 * 1000;
 
 export const MAX_STEP = 10 * 60 * 1000;
 export const TICK = 16;

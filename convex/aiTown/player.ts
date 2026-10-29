@@ -5,7 +5,6 @@ import { playerId } from './ids';
 import {
   PATHFINDING_TIMEOUT,
   PATHFINDING_BACKOFF,
-  HUMAN_IDLE_TOO_LONG,
   MAX_HUMAN_PLAYERS,
   MAX_PATHFINDS_PER_STEP,
 } from '../constants';
@@ -81,12 +80,11 @@ export class Player {
     this.speed = speed;
   }
 
-  tick(game: Game, now: number) {
-    // The manifested god stays until withdrawn; the god menu doesn't count as input.
-    const isGod = game.playerDescriptions.get(this.id)?.character === GOD_CHARACTER;
-    if (this.human && !isGod && this.lastInput < now - HUMAN_IDLE_TOO_LONG) {
-      this.leave(game, now);
-    }
+  tick(_game: Game, _now: number) {
+    // Humans used to be kicked after HUMAN_IDLE_TOO_LONG without input. The
+    // world now pauses whenever its tab is hidden, so that would kick the
+    // player out on every return: the player's character and the manifested
+    // god stay until they leave (or the character dies).
   }
 
   tickPathfinding(game: Game, now: number) {

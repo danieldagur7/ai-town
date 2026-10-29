@@ -44,8 +44,10 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   and saves a diff with `saveWorld`. It reschedules itself every `ENGINE_ACTION_DURATION`
   (30s). A `generationNumber` guarantees only one runner per world. Engine time is
   real wall-clock ms (`Date.now()`).
-  Crons (`convex/crons.ts`) stop idle worlds (`IDLE_WORLD_TIMEOUT`, 5 min without a
-  browser heartbeat) and restart dead ones.
+  Crons (`convex/crons.ts`) stop idle worlds (`IDLE_WORLD_TIMEOUT`, 45 s without a
+  browser heartbeat; pages only send heartbeats while their tab is visible, so hiding
+  or closing the tab pauses the world) and restart dead ones. Humans are no longer
+  kicked for idleness.
 - **Tick order** (`Game.tick`): players `tick` → `tickPathfinding` → `tickPosition` →
   conversations `tick` → agents `tick`. Only the engine writes the `worlds` doc.
 - **Inputs**: UI calls `useSendInput(engineId, name)` (`src/hooks/sendInput.ts`) →
