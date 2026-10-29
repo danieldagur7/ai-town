@@ -248,3 +248,7 @@ export const DECREE_OPINION_COOLDOWN = 8 * 60_000;
 // Background LLM work waits up to this long while the player is talking to
 // someone, so their replies come first (see convex/priority.ts).
 export const PLAYER_PRIORITY_MAX_WAIT = 45_000;
+
+// After the world pauses or is frozen, Ollama's models are unloaded at these
+// delays (ms) to free memory; they reload on the next request.
+export const UNLOAD_MODELS_AFTER = [20_000, 120_000];

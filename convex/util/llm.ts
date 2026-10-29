@@ -30,6 +30,10 @@ export const LLM_CONFIG = {
    */
 };
 
+export function ollamaUrl(path: string) {
+  return apiUrl(path);
+}
+
 function apiUrl(path: string) {
   // OPENAI_API_BASE and OLLAMA_HOST are legacy
   const host =

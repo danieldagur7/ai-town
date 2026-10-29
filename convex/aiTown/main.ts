@@ -5,7 +5,7 @@ import { Game } from './game';
 import { internal } from '../_generated/api';
 import { sleep } from '../util/sleep';
 import { Id } from '../_generated/dataModel';
-import { ENGINE_ACTION_DURATION } from '../constants';
+import { ENGINE_ACTION_DURATION, UNLOAD_MODELS_AFTER } from '../constants';
 
 export async function createEngine(ctx: MutationCtx) {
   const now = Date.now();
@@ -84,6 +84,11 @@ export async function stopEngine(ctx: MutationCtx, worldId: Id<'worlds'>) {
     throw new Error(`Engine ${engineId} isn't currently running`);
   }
   await ctx.db.patch(engineId, { running: false });
+  // Free the local models' memory once in-flight LLM work has had time to
+  // finish, and again later in case something late loaded them back.
+  for (const delay of UNLOAD_MODELS_AFTER) {
+    await ctx.scheduler.runAfter(delay, internal.ollama.unloadModels, { worldId });
+  }
 }
 
 export const runStep = internalAction({

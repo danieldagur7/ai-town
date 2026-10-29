@@ -46,7 +46,9 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   real wall-clock ms (`Date.now()`).
   Crons (`convex/crons.ts`) stop idle worlds (`IDLE_WORLD_TIMEOUT`, 45 s without a
   browser heartbeat; pages only send heartbeats while their tab is visible, so hiding
-  or closing the tab pauses the world) and restart dead ones. Humans are no longer
+  or closing the tab pauses the world) and restart dead ones. `stopEngine` (pause or
+  Freeze) also schedules `ollama:unloadModels`, which frees Ollama's model memory
+  (the server keeps running so the world can wake by itself). Humans are no longer
   kicked for idleness.
 - **Tick order** (`Game.tick`): players `tick` → `tickPathfinding` → `tickPosition` →
   conversations `tick` → agents `tick`. Only the engine writes the `worlds` doc.
