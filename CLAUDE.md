@@ -6,13 +6,17 @@ Order matters: Ollama, then the Convex backend, then the dev server.
 
 1. **Ollama**: the Ollama app must be running (`curl localhost:11434/api/version`).
    Models: `gemma3:12b` (chat), `mxbai-embed-large` (embeddings).
-2. **Convex backend** (terminal 1, from this repo root so its data lands here):
+2. **Convex backend**: started and stopped automatically (`scripts/backend.mjs`).
+   `npm run dev` starts it first (`predev`); the Vite dev server then starts it whenever a
+   visible game tab pings `/ai-town/__backend/ping` (`src/backendPing.ts`, every 15 s) and
+   stops it after 90 s without a ping unless the world is on Autorun. Logs go to
+   `logs/backend.log`. To run it by hand:
    ```bash
    DISABLE_BEACON=1 ../convex-backend-dl/convex-local-backend --interface 127.0.0.1 --instance-name carnitas --instance-secret 4361726e697461732c206c69746572616c6c79206d65616e696e6720226c6974
    ```
    The instance name/secret are the old public defaults; they must match the
    hard-coded admin key in `Justfile`. Keep `--interface 127.0.0.1`.
-3. **Dev server** (terminal 2): Node 18 is required.
+3. **Dev server**: Node 18 is required.
    ```bash
    source /opt/homebrew/opt/nvm/nvm.sh && nvm use 18 && npm run dev
    ```
