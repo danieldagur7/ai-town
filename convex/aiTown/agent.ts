@@ -31,6 +31,7 @@ import { playerGathering, tickGatheringMember } from './gathering';
 import { Player } from './player';
 import { GOD_CHARACTER } from '../../data/characters';
 import { Job, tickWorker } from './project';
+import { tickForaging } from './substances';
 
 const jobValidator = v.union(
   v.literal('farm'),
@@ -62,6 +63,12 @@ export class Agent {
   child?: boolean;
   // Index into HOUSES: where they sleep. Handed out on first need (beds.ts).
   home?: number;
+  // Magic mushrooms and Coca Loca (substances.ts).
+  foraging?: 'heading' | 'walking' | 'searching';
+  awakened?: boolean;
+  addiction?: number;
+  boostedUntil?: number;
+  lastHigh?: number;
 
   constructor(serialized: SerializedAgent) {
     const { id, lastConversation, lastInviteAttempt, inProgressOperation, bedtimeStarted } =
@@ -81,6 +88,11 @@ export class Agent {
     this.lastWorked = serialized.lastWorked;
     this.child = serialized.child;
     this.home = serialized.home;
+    this.foraging = serialized.foraging;
+    this.awakened = serialized.awakened;
+    this.addiction = serialized.addiction;
+    this.boostedUntil = serialized.boostedUntil;
+    this.lastHigh = serialized.lastHigh;
   }
 
   tick(game: Game, now: number) {
@@ -154,6 +166,9 @@ export class Agent {
     // If we have been wandering but haven't thought about something to do for
     // a while, do something.
     // Free time by day: maybe go work on the town's project instead.
+    if (!conversation && !doingActivity && tickForaging(game, now, this, player)) {
+      return;
+    }
     if (!conversation && !doingActivity && !this.child && tickWorker(game, now, this, player)) {
       return;
     }
@@ -425,6 +440,11 @@ export class Agent {
       lastWorked: this.lastWorked,
       child: this.child,
       home: this.home,
+      foraging: this.foraging,
+      awakened: this.awakened,
+      addiction: this.addiction,
+      boostedUntil: this.boostedUntil,
+      lastHigh: this.lastHigh,
     };
   }
 }
@@ -452,6 +472,11 @@ export const serializedAgent = {
   lastWorked: v.optional(v.number()),
   child: v.optional(v.boolean()),
   home: v.optional(v.number()),
+  foraging: v.optional(v.union(v.literal('heading'), v.literal('walking'), v.literal('searching'))),
+  awakened: v.optional(v.boolean()),
+  addiction: v.optional(v.number()),
+  boostedUntil: v.optional(v.number()),
+  lastHigh: v.optional(v.number()),
 };
 export type SerializedAgent = ObjectType<typeof serializedAgent>;
 
@@ -513,6 +538,15 @@ export async function runAgentOperation(ctx: MutationCtx, operation: string, arg
       break;
     case 'rememberLifeEvent':
       reference = internal.life.rememberLifeEvent;
+      break;
+    case 'awaken':
+      reference = internal.substances.awaken;
+      break;
+    case 'overdose':
+      reference = internal.substances.overdose;
+      break;
+    case 'substanceCraving':
+      reference = internal.substances.craving;
       break;
     default:
       throw new Error(`Unknown operation: ${operation}`);

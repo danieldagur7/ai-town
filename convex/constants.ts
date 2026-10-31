@@ -244,3 +244,19 @@ export const DECREE_OPINION_COOLDOWN = 8 * 60_000;
 // After the world pauses or is frozen, Ollama's models are unloaded at these
 // delays (ms) to free memory; they reload on the next request.
 export const UNLOAD_MODELS_AFTER = [20_000, 120_000];
+
+// Magic mushrooms and Coca Loca (convex/aiTown/substances.ts; 18+ content).
+// Each morning each adult may go mushroom hunting; of those who find one, only
+// some dare eat it. Eating one "awakens" them for good.
+export const MUSHROOM_FIND_CHANCE = 0.03;
+export const MUSHROOM_TAKE_CHANCE = 0.35;
+// Chance per morning that someone finds the wild Coca Loca bushes, while nobody knows of them.
+export const COCA_DISCOVER_CHANCE = 0.08;
+// Chance of taking it when starting a shift, plus addiction/200 (max 0.6).
+export const COCA_BASE_CHANCE = 0.05;
+// A hit: twice-as-fast work for COCA_DURATION, +COCA_HIT addiction (0–100).
+export const COCA_DURATION = 5 * 60_000;
+export const COCA_HIT = 15;
+// Heavy users (addiction at least this) risk an overdose with each hit.
+export const COCA_OVERDOSE_ADDICTION = 70;
+export const COCA_OVERDOSE_CHANCE = 0.04;

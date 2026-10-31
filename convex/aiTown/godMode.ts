@@ -73,6 +73,24 @@ export const godModeInputs = {
       });
     },
   }),
+  // Send someone mushroom hunting in the woods (they still choose whether to eat it).
+  sendForaging: inputHandler({
+    args: { playerId: v.string() },
+    handler: (game, _now, args) => {
+      const agent = [...game.world.agents.values()].find((a) => a.playerId === args.playerId);
+      if (!agent) throw new Error('Only townspeople can go foraging');
+      agent.foraging = 'heading';
+      return null;
+    },
+  }),
+  // Let the town find the wild Coca Loca bushes.
+  discoverCoca: inputHandler({
+    args: {},
+    handler: (game) => {
+      game.world.cocaKnown = true;
+      return null;
+    },
+  }),
   // Debug: add (or remove) work on the project, e.g. to see the later stages.
   addProjectWork: inputHandler({
     args: { shifts: v.number() },

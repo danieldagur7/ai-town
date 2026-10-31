@@ -30,6 +30,8 @@ export const serializedWorld = {
   lastMeetingDay: v.optional(v.number()),
   lastMeetingCheckDay: v.optional(v.number()),
   lastMorningDay: v.optional(v.number()),
+  // Someone has found the wild Coca Loca bushes (substances.ts).
+  cocaKnown: v.optional(v.boolean()),
   // Mornings in a row without enough food.
   hungryDays: v.optional(v.number()),
   // The town's building project (the statue), in progress or finished.
@@ -60,6 +62,7 @@ export class World {
   lastMeetingDay?: number;
   lastMeetingCheckDay?: number;
   lastMorningDay?: number;
+  cocaKnown?: boolean;
   hungryDays?: number;
   project?: Project;
   structures: Structure[];
@@ -77,6 +80,7 @@ export class World {
     this.lastMeetingDay = serialized.lastMeetingDay;
     this.lastMeetingCheckDay = serialized.lastMeetingCheckDay;
     this.lastMorningDay = serialized.lastMorningDay;
+    this.cocaKnown = serialized.cocaKnown;
     this.hungryDays = serialized.hungryDays;
     this.project = serialized.project;
     this.structures = serialized.structures ?? [];
@@ -136,6 +140,7 @@ export class World {
       lastMeetingDay: this.lastMeetingDay,
       lastMeetingCheckDay: this.lastMeetingCheckDay,
       lastMorningDay: this.lastMorningDay,
+      cocaKnown: this.cocaKnown,
       hungryDays: this.hungryDays,
       project: this.project,
       structures: this.structures,

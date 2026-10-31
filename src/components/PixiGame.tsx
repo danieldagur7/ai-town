@@ -198,17 +198,24 @@ function Players(props: {
   const { historicalTime } = useHistoricalTime(props.engineStatus);
   // Who's talking or thinking only changes when the game state does, not every
   // frame, so work it out once here rather than per person per frame.
-  const { speaking, thinking } = useMemo(() => {
+  const { speaking, thinking, extra } = useMemo(() => {
     const speaking = new Set<string>();
     for (const c of props.game.world.conversations.values()) {
       if (c.isTyping) speaking.add(c.isTyping.playerId);
     }
     for (const g of props.game.world.gatherings) if (g.speaking) speaking.add(g.speaking);
     const thinking = new Set<string>();
+    // Magic mushrooms and Coca Loca show on the map too.
+    const extra: Record<string, string[]> = {};
+    const now = Date.now();
     for (const a of props.game.world.agents.values()) {
       if (a.inProgressOperation && !speaking.has(a.playerId)) thinking.add(a.playerId);
+      const marks = [];
+      if (a.awakened) marks.push('awakened');
+      if (a.boostedUntil !== undefined && a.boostedUntil > now) marks.push('wired');
+      if (marks.length) extra[a.playerId] = marks;
     }
-    return { speaking, thinking };
+    return { speaking, thinking, extra };
   }, [props.game]);
   return (
     <>
@@ -220,7 +227,9 @@ function Players(props: {
           isViewer={p.id === props.humanPlayerId}
           onClick={props.onClick}
           historicalTime={historicalTime}
-          effects={props.effects?.[p.id]}
+          effects={
+            extra[p.id] ? [...(props.effects?.[p.id] ?? []), ...extra[p.id]] : props.effects?.[p.id]
+          }
           isSpeaking={speaking.has(p.id)}
           isThinking={thinking.has(p.id)}
         />

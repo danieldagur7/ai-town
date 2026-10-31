@@ -105,12 +105,18 @@ export const Character = ({
   const clock = useRef({ t: Math.random() * 100, seed: Math.random() * 10 });
   const moving = useRef(isMoving);
   moving.current = isMoving;
+  const wired = useRef(false);
+  wired.current = effects.includes('wired');
   useTick((delta) => {
     const b = body.current;
     if (!b) return;
     const c = clock.current;
     c.t += delta / 60;
-    const p = moving.current ? walkPose(c.t) : quirkPose(quirk, c.t, c.seed);
+    // Wired on Coca Loca: everything at double speed, and they can't keep still.
+    if (wired.current) c.t += delta / 60;
+    const p = moving.current
+      ? walkPose(c.t)
+      : quirkPose(wired.current ? 'fidget' : quirk, c.t, c.seed);
     b.position.set(p.dx, p.dy);
     b.rotation = p.rot;
     b.scale.set(p.sx, p.sy);
@@ -142,6 +148,7 @@ export const Character = ({
       cursor="pointer"
     >
       {(divine || effects.includes('glow')) && <DivineGlow />}
+      {effects.includes('awakened') && <DivineGlow color={0xb07cff} />}
       {isViewer && <ViewerIndicator />}
       <Sprite ref={shadow} texture={shadowTexture()} anchor={{ x: 0.5, y: 0.5 }} y={15} />
       <Container ref={body}>
@@ -416,16 +423,20 @@ function NameLabel({ name, y }: { name: string; y: number }) {
   );
 }
 
-function DivineGlow() {
-  const draw = useCallback((g: PIXI.Graphics) => {
-    g.clear();
-    // Soft light on the ground, brighter towards the middle.
-    for (let i = 0; i < 5; i++) {
-      g.beginFill(0xffe9a0, 0.08);
-      g.drawEllipse(0, 12, 26 - i * 4, 12 - i * 2);
-      g.endFill();
-    }
-  }, []);
+// Soft light on the ground: gold for the divine, violet for the awakened.
+function DivineGlow({ color = 0xffe9a0 }: { color?: number }) {
+  const draw = useCallback(
+    (g: PIXI.Graphics) => {
+      g.clear();
+      // Brighter towards the middle.
+      for (let i = 0; i < 5; i++) {
+        g.beginFill(color, 0.08);
+        g.drawEllipse(0, 12, 26 - i * 4, 12 - i * 2);
+        g.endFill();
+      }
+    },
+    [color],
+  );
   return <Graphics draw={draw} />;
 }
 

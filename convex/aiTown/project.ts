@@ -21,6 +21,7 @@ import {
 } from '../constants';
 import { ERAS, eraOf, houseArtKey, structureArtKey } from './eras';
 import { Direction, directionOf, townLooksLine } from './townView';
+import { isBoosted, maybeTakeCoca } from './substances';
 
 export const BUILDING = 'building';
 
@@ -369,7 +370,10 @@ export function tickWorker(game: Game, now: number, agent: Agent, player: Player
     const job: Job = working.job ?? 'build';
     if ('shiftStarted' in working) {
       // The shift is over (or was cut short by a conversation): count the time worked.
-      const share = Math.min(1, (now - working.shiftStarted) / WORK_SHIFT);
+      const share = Math.min(
+        1,
+        (now - working.shiftStarted) / shiftLength(agent, working.shiftStarted),
+      );
       delete agent.working;
       agent.lastWorked = now;
       if (share <= 0) return false;
@@ -403,19 +407,24 @@ export function tickWorker(game: Game, now: number, agent: Agent, player: Player
     ) {
       return false;
     }
-    // Arrived (or close enough): start the shift.
+    // Arrived (or close enough): start the shift, maybe on Coca Loca.
+    maybeTakeCoca(game, now, agent);
+    const boosted = isBoosted(agent, now);
     agent.working = { shiftStarted: now, job };
     const what = JOBS[job];
     player.activity = {
-      description: job === 'build' ? `${BUILDING} ${world.project!.name}` : what.description,
-      emoji: what.emoji,
-      until: now + WORK_SHIFT,
+      description:
+        (job === 'build' ? `${BUILDING} ${world.project!.name}` : what.description) +
+        (boosted ? ' (wired on Coca Loca)' : ''),
+      emoji: boosted ? '⚡' : what.emoji,
+      until: now + shiftLength(agent, now),
     };
     return true;
   }
   if (
     !isWorkTime(game) ||
-    (agent.lastWorked !== undefined && now < agent.lastWorked + WORK_REST) ||
+    (agent.lastWorked !== undefined &&
+      now < agent.lastWorked + (isBoosted(agent, now) ? WORK_REST / 2 : WORK_REST)) ||
     Math.random() >= WORK_CHANCE
   ) {
     return false;
@@ -427,6 +436,11 @@ export function tickWorker(game: Game, now: number, agent: Agent, player: Player
   movePlayer(game, now, player, spot);
   agent.working = { walking: true, job };
   return true;
+}
+
+// On Coca Loca (at the shift's start) a full shift's work gets done in half the time.
+function shiftLength(agent: Agent, now: number) {
+  return isBoosted(agent, now) ? WORK_SHIFT / 2 : WORK_SHIFT;
 }
 
 function isWorkTime(game: Game) {

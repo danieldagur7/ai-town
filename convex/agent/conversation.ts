@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { substancePrompt } from '../substances';
 import { Id } from '../_generated/dataModel';
 import { ActionCtx, internalQuery } from '../_generated/server';
 import { LLMMessage, chatCompletion } from '../util/llm';
@@ -417,7 +418,11 @@ export const queryPromptData = internalQuery({
     const myAge =
       ageLine(await residentAge(ctx.db, args.worldId, args.playerId, day)) +
       wellbeingLine(await residentMood(ctx.db, args.worldId, args.playerId)) +
-      (await traitsPrompt(ctx.db, args.worldId, args.playerId));
+      (await traitsPrompt(ctx.db, args.worldId, args.playerId)) +
+      // Awakened by a magic mushroom, or on/hooked on Coca Loca.
+      substancePrompt(agent, !!otherPlayer.human)
+        .map((line) => ` ${line}`)
+        .join('');
     const otherAge = await residentAge(ctx.db, args.worldId, args.otherPlayerId, day);
     const timeOfDay =
       (clock

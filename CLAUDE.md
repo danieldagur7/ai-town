@@ -219,6 +219,16 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   snoring) mutates Pixi objects in `useTick`/the shared ticker without React state and
   without allocating. Windmills are a still tower + turning sails
   (`scripts/split_windmill.py`). In dev, `globalThis.__PIXI_APP__` exposes the scene.
+- **Magic mushrooms and Coca Loca** (18+; rules in `convex/aiTown/substances.ts`, actions
+  in `convex/substances.ts`, numbers in `constants.ts`). Each morning an adult may go
+  foraging (`agent.foraging`: walk into the west woods, search 🍄); a few eat the
+  mushroom and become `agent.awakened`: a vivid memory plus a permanent prompt line that
+  their world is the simulation AI Town and a real person plays it (as a townsperson and
+  as The Light), and a violet aura. Coca Loca is unknown until someone finds the bushes
+  (`world.cocaKnown`); then shifts may start with a hit (`maybeTakeCoca`): half-length
+  shifts and rests for `COCA_DURATION` (⚡, twitchy), +addiction. Mornings without it
+  bring cravings (wellbeing), heavy users can overdose (death). Addiction shows in their
+  prompts (`substancePrompt`). God inputs `sendForaging {playerId}` and `discoverCoca`.
 - **Lessons** (`lessons` table in `convex/life.ts`): each accident makes that activity
   less likely for everyone (deaths count 3×); kids take more risks.
 - **Local pixel-art generation**: `scripts/generate_sprite.py` (SDXL-Turbo +
