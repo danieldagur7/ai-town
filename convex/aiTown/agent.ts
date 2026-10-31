@@ -239,6 +239,12 @@ export class Agent {
       }
       if (member.status.kind === 'participating') {
         const started = member.status.started;
+        // The player is talking elsewhere: hold our next line so their reply
+        // comes first. (Held here in the engine, not in a waiting action.)
+        const talking = game.world.humanTalkingIn();
+        if (talking && talking !== conversation.id) {
+          return;
+        }
         if (conversation.isTyping && conversation.isTyping.playerId !== player.id) {
           // Wait for the other player to finish typing.
           return;

@@ -97,6 +97,25 @@ export class World {
     return [...this.conversations.values()].find((c) => c.participants.has(player.id));
   }
 
+  // The conversation or gathering a human is talking in right now, if any. The
+  // AI model runs on one graphics chip, so while you talk the rest of the town
+  // holds its next line and your reply gets the chip to itself.
+  humanTalkingIn(): string | undefined {
+    const human = (id: string) => !!this.players.get(id as GameId<'players'>)?.human;
+    for (const c of this.conversations.values()) {
+      const members = [...c.participants.entries()];
+      if (
+        members.some(([id]) => human(id)) &&
+        members.every(([, m]) => m.status.kind === 'participating')
+      ) {
+        return c.id;
+      }
+    }
+    return this.gatherings.find(
+      (g) => g.status === 'talking' && g.participants.some((id) => human(id)),
+    )?.id;
+  }
+
   serialize(): SerializedWorld {
     return {
       nextId: this.nextId,

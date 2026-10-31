@@ -105,11 +105,17 @@ export async function ollamaUp() {
   }
 }
 
-// Ollama is started here (not as the Homebrew service) so it can work on
-// several requests at once: the town's chatter, memories and prayers run side
-// by side with the player's conversation instead of queueing ahead of it.
+// Ollama is started here (not as the Homebrew service) with settings tuned for
+// this game. Measured on this Mac (M5, 24 GB): the graphics chip is the limit,
+// so N requests at once each take about N times as long as one alone (~6 s). More
+// slots don't make anyone faster; what keeps the player's replies fast is the
+// town holding its lines while they talk (World.humanTalkingIn). Four slots let
+// the town's chatter, memories and prayers overlap the rest of the time; flash
+// attention and an 8-bit KV cache halve each slot's memory.
 const OLLAMA_ENV = {
-  OLLAMA_NUM_PARALLEL: '3',
+  OLLAMA_NUM_PARALLEL: '4',
+  OLLAMA_FLASH_ATTENTION: '1',
+  OLLAMA_KV_CACHE_TYPE: 'q8_0',
   // Chat and embedding models stay loaded together.
   OLLAMA_MAX_LOADED_MODELS: '2',
   OLLAMA_KEEP_ALIVE: '10m',

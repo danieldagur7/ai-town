@@ -11,8 +11,7 @@ Start the dev server (3), open the page, press Start.
    are off it shows "The town is asleep" with Start, and the toolbar has Stop while on. The
    Vite dev server does the switching (`/ai-town/__power/status|start|stop`): the backend
    is spawned detached (logs in `logs/backend.log`), and so is `ollama serve` with
-   `OLLAMA_NUM_PARALLEL=3` (logs in `logs/ollama.log`), so the town's chatter runs
-   alongside the player's conversation instead of queueing ahead of it. With every game tab closed for 90 s it switches both off unless the world is
+   `OLLAMA_NUM_PARALLEL=4`, flash attention and an 8-bit KV cache (logs in `logs/ollama.log`). With every game tab closed for 90 s it switches both off unless the world is
    on Autorun. `npm run dev` starts only the backend (to push code), which goes off after
    the same grace period. From a terminal: `node scripts/backend.mjs start|stop`. A
    viewer's heartbeat restarts an engine that died with the backend. By hand:
@@ -197,8 +196,11 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   opinions have a cooldown and one call per gathering; at most `MAX_AI_CONVERSATIONS`
   townsperson-only conversations and one group chat at a time; each agent prays with
   `PRAYER_CHANCE`. The image server loads its model on demand and frees it after 60 s
-  idle (it shares GPU memory with Ollama). Ollama serves 3 requests at once, so the
-  player's replies don't wait behind the town. **Never make actions wait in a loop for
+  idle (it shares GPU memory with Ollama). Ollama serves 4 requests at once (flash attention, 8-bit
+  KV cache), but the graphics chip is the limit: N requests at once each take ~N× as
+  long as one alone (~6 s). So while a human talks (`World.humanTalkingIn`), other
+  conversations and gatherings hold their next line in the engine, and the player's
+  reply gets the chip to itself. **Never make actions wait in a loop for
   their turn**: a waiting action holds one of the backend's few action slots, and enough
   of them starve the engine's `runStep` (the town freezes, nobody answers).
   `yieldToPlayer` is a no-op kept for its callers. Remembering a conversation runs

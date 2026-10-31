@@ -164,6 +164,11 @@ export function tickGatherings(game: Game, now: number) {
     if (gathering.lastMessage && now < gathering.lastMessage.timestamp + GATHER_MESSAGE_GAP) {
       continue;
     }
+    // The player is talking elsewhere: the gathering waits a moment for them.
+    const talking = game.world.humanTalkingIn();
+    if (talking && talking !== gathering.id) {
+      continue;
+    }
     // The caller opens (waiting for them if they're here but busy); after that,
     // anyone present except whoever spoke last.
     if (gathering.numMessages === 0 && here.includes(gathering.caller)) {
