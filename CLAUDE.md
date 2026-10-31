@@ -2,15 +2,19 @@
 
 ## Starting everything
 
-Order matters: Ollama, then the Convex backend, then the dev server.
+Start the dev server (3), open the page, press Start.
 
 1. **Ollama**: the Ollama app must be running (`curl localhost:11434/api/version`).
    Models: `gemma3:12b` (chat), `mxbai-embed-large` (embeddings).
-2. **Convex backend**: started and stopped automatically (`scripts/backend.mjs`).
-   `npm run dev` starts it first (`predev`); the Vite dev server then starts it whenever a
-   visible game tab pings `/ai-town/__backend/ping` (`src/backendPing.ts`, every 15 s) and
-   stops it after 90 s without a ping unless the world is on Autorun. Logs go to
-   `logs/backend.log`. To run it by hand:
+2. **Convex backend and Ollama: off until you press Start** on the page (`scripts/backend.mjs`,
+   `src/power.ts`, `src/components/Power.tsx`). The page is always reachable; while things
+   are off it shows "The town is asleep" with Start, and the toolbar has Stop while on. The
+   Vite dev server does the switching (`/ai-town/__power/status|start|stop`): the backend
+   is spawned detached (logs in `logs/backend.log`), Ollama via `brew services start|stop
+   ollama`. With every game tab closed for 90 s it switches both off unless the world is
+   on Autorun. `npm run dev` starts only the backend (to push code), which goes off after
+   the same grace period. From a terminal: `node scripts/backend.mjs start|stop`. A
+   viewer's heartbeat restarts an engine that died with the backend. By hand:
    ```bash
    DISABLE_BEACON=1 ../convex-backend-dl/convex-local-backend --interface 127.0.0.1 --instance-name carnitas --instance-secret 4361726e697461732c206c69746572616c6c79206d65616e696e6720226c6974
    ```

@@ -1,12 +1,16 @@
-// Runs the local Convex backend only while someone is playing (or the town is
-// on Autorun). A web page can't start programs, so the Vite dev server does it
-// (see `backendSupervisor` below, used in vite.config.ts): open game tabs ping
-// /ai-town/__backend/ping while visible; a ping starts the backend if it's down,
-// and once nobody has pinged for IDLE_MS it is shut down unless the world is on
-// Autorun. By then the world has paused itself and Ollama has unloaded.
+// Start/stop for the town's machinery: the local Convex backend and Ollama.
+// The page is always reachable (it's served by the Vite dev server); both are off
+// until you press Start on it, and Stop turns both off again. A web page can't
+// start programs, so the dev server does it through these endpoints (see
+// `backendSupervisor`, used in vite.config.ts):
+//   GET  /ai-town/__power/status  -> { backend: bool, ollama: bool }
+//   POST /ai-town/__power/start   -> starts Ollama, then the backend
+//   POST /ai-town/__power/stop    -> stops the backend, then Ollama
+// Closing every game tab also stops both after IDLE_MS (pages ping while
+// visible), unless the world is on Autorun.
 //
-// `node scripts/backend.mjs start` starts it (detached) and waits until it's up;
-// `npm run dev` runs this first so functions can be pushed.
+// `node scripts/backend.mjs start|stop` does the same from a terminal;
+// `npm run dev` starts the backend first so functions can be pushed.
 import { execFileSync, spawn } from 'child_process';
 import { mkdirSync, openSync } from 'fs';
 import path from 'path';
@@ -85,41 +89,117 @@ export function stopBackend() {
   }
 }
 
+const OLLAMA = 'http://127.0.0.1:11434';
+
+export async function ollamaUp() {
+  try {
+    return (await fetch(`${OLLAMA}/api/version`, { signal: AbortSignal.timeout(1500) })).ok;
+  } catch {
+    return false;
+  }
+}
+
+// Ollama runs as a Homebrew service (launchd restarts it if it's just killed).
+export async function startOllama() {
+  if (await ollamaUp()) return;
+  execFileSync('brew', ['services', 'start', 'ollama'], { stdio: 'ignore' });
+  for (let i = 0; i < 60 && !(await ollamaUp()); i++) {
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+
+export function stopOllama() {
+  try {
+    execFileSync('brew', ['services', 'stop', 'ollama'], { stdio: 'ignore' });
+  } catch {
+    // Not installed as a service, or already stopped.
+  }
+}
+
+export async function powerOn() {
+  await startOllama();
+  await startBackend({ detached: true });
+}
+
+export function powerOff() {
+  stopBackend();
+  stopOllama();
+}
+
 /** @returns {import('vite').Plugin} */
 export function backendSupervisor() {
   return {
-    name: 'backend-supervisor',
+    name: 'power-switch',
     apply: /** @type {const} */ ('serve'),
     configureServer(server) {
-      // Starting the dev server counts as a visit, so the backend gets the
-      // same grace period as a just-closed tab.
-      let lastPing = Date.now();
-      let starting;
+      // On only after Start is pressed; `npm run dev` brings the backend up just
+      // to push code, and it goes off again after the grace period.
+      const startedAt = Date.now();
+      let poweredOn = false;
+      let lastPing = 0;
+      let busy;
+      const reply = (res, value) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(value));
+      };
+      const status = async () => ({ backend: await isUp(), ollama: await ollamaUp() });
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith('/ai-town/__backend/ping')) return next();
-        lastPing = Date.now();
-        starting ??= startBackend({ detached: true }).finally(() => (starting = undefined));
-        starting.then(
-          () => res.end('ok'),
-          (e) => {
-            res.statusCode = 500;
-            res.end(String(e));
-          },
-        );
-      });
-      const timer = setInterval(async () => {
-        if (Date.now() - lastPing < IDLE_MS || starting) return;
-        if ((await isUp()) && !(await autorunOn())) {
-          console.log('[backend] nobody is playing and Autorun is off: stopping the backend');
-          stopBackend();
+        const url = req.url ?? '';
+        if (!url.startsWith('/ai-town/__power/')) return next();
+        const action = url.slice('/ai-town/__power/'.length).split('?')[0];
+        if (action === 'ping') {
+          lastPing = Date.now();
+          res.end('ok');
+          return;
         }
+        if (action === 'status') {
+          status().then((s) => reply(res, { ...s, busy: !!busy }));
+          return;
+        }
+        if ((action === 'start' || action === 'stop') && req.method === 'POST') {
+          console.log(`[power] ${action}`);
+          poweredOn = action === 'start';
+          lastPing = Date.now();
+          busy ??= (action === 'start' ? powerOn() : Promise.resolve(powerOff())).finally(
+            () => (busy = undefined),
+          );
+          busy.then(
+            async () => reply(res, await status()),
+            (e) => {
+              res.statusCode = 500;
+              res.end(String(e));
+            },
+          );
+          return;
+        }
+        res.statusCode = 404;
+        res.end();
+      });
+      // Not switched on, or nobody watching, and not on Autorun: switch off.
+      const timer = setInterval(async () => {
+        if (busy || Date.now() - startedAt < IDLE_MS) return;
+        if (poweredOn && Date.now() - lastPing < IDLE_MS) return;
+        const [backend, ollama] = [await isUp(), await ollamaUp()];
+        if (!backend && !ollama) return;
+        if (backend && (await autorunOn())) return;
+        console.log('[power] nobody is playing and Autorun is off: switching off');
+        poweredOn = false;
+        powerOff();
       }, CHECK_MS);
       server.httpServer?.on('close', () => clearInterval(timer));
     },
   };
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === 'start') {
+const command = process.argv[1] === fileURLToPath(import.meta.url) ? process.argv[2] : undefined;
+if (command === 'start-backend') {
   await startBackend({ detached: true });
-  console.log((await isUp()) ? '[backend] up' : '[backend] did not come up, see logs/backend.log');
+} else if (command === 'start') {
+  await powerOn();
+  console.log(
+    (await isUp()) ? '[power] on' : '[power] backend did not come up, see logs/backend.log',
+  );
+} else if (command === 'stop') {
+  powerOff();
+  console.log('[power] off');
 }

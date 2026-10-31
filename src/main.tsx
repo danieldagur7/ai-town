@@ -5,9 +5,6 @@ import './index.css';
 import 'uplot/dist/uPlot.min.css';
 import 'react-toastify/dist/ReactToastify.css';
 import ConvexClientProvider from './components/ConvexClientProvider.tsx';
-import { keepBackendAwake } from './backendPing.ts';
-
-keepBackendAwake();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

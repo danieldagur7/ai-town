@@ -53,6 +53,16 @@ export const heartbeatWorld = mutation({
       await ctx.db.patch(worldStatus._id, { status: 'running' });
       await startEngine(ctx, worldStatus.worldId);
     }
+    // Someone's watching a world whose engine died (e.g. the backend was
+    // switched off mid-step): wake it now rather than waiting for the cron.
+    if (worldStatus.status === 'running') {
+      const engine = await ctx.db.get(worldStatus.engineId);
+      // A running engine saves every step (1 s), so 15 s of silence means it's gone.
+      if (engine?.currentTime && engine.currentTime < now - 15_000) {
+        console.warn(`Restarting dead engine ${engine._id} for a viewer...`);
+        await kickEngine(ctx, worldStatus.worldId);
+      }
+    }
   },
 });
 

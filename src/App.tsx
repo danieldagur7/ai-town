@@ -12,6 +12,7 @@ import Button from './components/buttons/Button.tsx';
 import HeroMenu from './components/HeroMenu.tsx';
 import FreezeButton from './components/FreezeButton.tsx';
 import AutorunButton from './components/AutorunButton.tsx';
+import { PowerScreen, StopButton } from './components/Power.tsx';
 import ClockBadge from './components/ClockBadge.tsx';
 import ResourceBar from './components/ResourceBar.tsx';
 import TownNews from './components/TownNews.tsx';
@@ -75,6 +76,7 @@ export default function Home() {
         <header className="absolute top-0 left-0 z-10 flex flex-wrap items-center gap-3 p-3 pointer-events-none">
           <FreezeButton />
           <MusicButton />
+          <StopButton />
           <AutorunButton />
           <HeroMenu />
           <Button imgUrl={helpImg} onClick={() => setHelpModalOpen(true)}>
@@ -86,6 +88,7 @@ export default function Home() {
           <ResourceBar />
           <TownNews />
         </header>
+        <PowerScreen />
         <ToastContainer position="bottom-right" autoClose={2000} closeOnClick theme="dark" />
       </main>
     </GodUiProvider>
