@@ -5,7 +5,8 @@ import stopImg from '../../assets/close.svg';
 // While everything is off: a screen with Start, over the (empty) game.
 export function PowerScreen() {
   const power = usePower();
-  if (!import.meta.env.DEV || !power.known || (power.backend && !power.busy)) return null;
+  if (!import.meta.env.DEV || !power.known || (power.backend && power.ollama && !power.busy))
+    return null;
   return (
     <div className="absolute inset-0 z-30 grid place-items-center bg-[#181425]/85 p-4">
       <div className="max-w-sm border-8 border-brown-900 bg-brown-800 p-6 text-center text-brown-100 shadow-2xl">

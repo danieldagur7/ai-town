@@ -76,17 +76,23 @@ async function autorunOn() {
 
 // Stops whichever convex-local-backend listens on the port (ours, or one
 // started by hand in a terminal).
-export function stopBackend() {
+function killListener(port, name) {
   let pids = [];
   try {
-    pids = execFileSync('lsof', ['-tiTCP:3210', '-sTCP:LISTEN']).toString().split('\n');
+    pids = execFileSync('lsof', [`-tiTCP:${port}`, '-sTCP:LISTEN'])
+      .toString()
+      .split('\n');
   } catch {
     return; // Nothing listening.
   }
   for (const pid of pids.filter(Boolean)) {
     const command = execFileSync('ps', ['-o', 'command=', '-p', pid]).toString();
-    if (command.includes('convex-local-backend')) process.kill(Number(pid), 'SIGTERM');
+    if (command.includes(name)) process.kill(Number(pid), 'SIGTERM');
   }
+}
+
+export function stopBackend() {
+  killListener(3210, 'convex-local-backend');
 }
 
 const OLLAMA = 'http://127.0.0.1:11434';
@@ -99,21 +105,39 @@ export async function ollamaUp() {
   }
 }
 
-// Ollama runs as a Homebrew service (launchd restarts it if it's just killed).
+// Ollama is started here (not as the Homebrew service) so it can work on
+// several requests at once: the town's chatter, memories and prayers run side
+// by side with the player's conversation instead of queueing ahead of it.
+const OLLAMA_ENV = {
+  OLLAMA_NUM_PARALLEL: '3',
+  // Chat and embedding models stay loaded together.
+  OLLAMA_MAX_LOADED_MODELS: '2',
+  OLLAMA_KEEP_ALIVE: '10m',
+};
+
 export async function startOllama() {
   if (await ollamaUp()) return;
-  execFileSync('brew', ['services', 'start', 'ollama'], { stdio: 'ignore' });
+  mkdirSync(path.join(ROOT, 'logs'), { recursive: true });
+  const log = openSync(path.join(ROOT, 'logs/ollama.log'), 'a');
+  console.log('[power] starting Ollama');
+  spawn('ollama', ['serve'], {
+    env: { ...process.env, ...OLLAMA_ENV },
+    stdio: ['ignore', log, log],
+    detached: true,
+  }).unref();
   for (let i = 0; i < 60 && !(await ollamaUp()); i++) {
     await new Promise((r) => setTimeout(r, 500));
   }
 }
 
 export function stopOllama() {
+  // An older setup ran it as a Homebrew service, which launchd would restart.
   try {
     execFileSync('brew', ['services', 'stop', 'ollama'], { stdio: 'ignore' });
   } catch {
     // Not installed as a service, or already stopped.
   }
+  killListener(11434, 'ollama');
 }
 
 export async function powerOn() {
@@ -137,6 +161,14 @@ export function backendSupervisor() {
       const startedAt = Date.now();
       let poweredOn = false;
       let lastPing = 0;
+      // Restarted while the town was on (Vite reloads when this file changes):
+      // carry on as switched on.
+      void Promise.all([isUp(), ollamaUp()]).then(([backend, ollama]) => {
+        if (backend && ollama) {
+          poweredOn = true;
+          lastPing = Date.now();
+        }
+      });
       let busy;
       const reply = (res, value) => {
         res.setHeader('Content-Type', 'application/json');

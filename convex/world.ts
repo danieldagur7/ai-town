@@ -57,8 +57,7 @@ export const heartbeatWorld = mutation({
     // switched off mid-step): wake it now rather than waiting for the cron.
     if (worldStatus.status === 'running') {
       const engine = await ctx.db.get(worldStatus.engineId);
-      // A running engine saves every step (1 s), so 15 s of silence means it's gone.
-      if (engine?.currentTime && engine.currentTime < now - 15_000) {
+      if (engine?.currentTime && engine.currentTime < now - ENGINE_ACTION_DURATION * 2) {
         console.warn(`Restarting dead engine ${engine._id} for a viewer...`);
         await kickEngine(ctx, worldStatus.worldId);
       }

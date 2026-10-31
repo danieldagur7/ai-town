@@ -10,8 +10,9 @@ Start the dev server (3), open the page, press Start.
    `src/power.ts`, `src/components/Power.tsx`). The page is always reachable; while things
    are off it shows "The town is asleep" with Start, and the toolbar has Stop while on. The
    Vite dev server does the switching (`/ai-town/__power/status|start|stop`): the backend
-   is spawned detached (logs in `logs/backend.log`), Ollama via `brew services start|stop
-   ollama`. With every game tab closed for 90 s it switches both off unless the world is
+   is spawned detached (logs in `logs/backend.log`), and so is `ollama serve` with
+   `OLLAMA_NUM_PARALLEL=3` (logs in `logs/ollama.log`), so the town's chatter runs
+   alongside the player's conversation instead of queueing ahead of it. With every game tab closed for 90 s it switches both off unless the world is
    on Autorun. `npm run dev` starts only the backend (to push code), which goes off after
    the same grace period. From a terminal: `node scripts/backend.mjs start|stop`. A
    viewer's heartbeat restarts an engine that died with the backend. By hand:
@@ -196,11 +197,11 @@ not `reset-local-backend`). The repo path contains a space, so `just` prints a h
   opinions have a cooldown and one call per gathering; at most `MAX_AI_CONVERSATIONS`
   townsperson-only conversations and one group chat at a time; each agent prays with
   `PRAYER_CHANCE`. The image server loads its model on demand and frees it after 60 s
-  idle (it shares GPU memory with Ollama). Player conversations come first: background
-  LLM work calls `yieldToPlayer` (`convex/priority.ts`), which waits while a human is
-  talking to someone and then takes the single background turn (`llmLease` table;
-  release it in a `finally`), so Ollama never holds more than one background request
-  ahead of the player's. Replies to a human skip both. Remembering a conversation runs
+  idle (it shares GPU memory with Ollama). Ollama serves 3 requests at once, so the
+  player's replies don't wait behind the town. **Never make actions wait in a loop for
+  their turn**: a waiting action holds one of the backend's few action slots, and enough
+  of them starve the engine's `runStep` (the town freezes, nobody answers).
+  `yieldToPlayer` is a no-op kept for its callers. Remembering a conversation runs
   in the background (not an agent operation), and a conversation ending frees any
   participant still writing a reply for it, so nobody ignores the player's invite. At bedtime nobody leaves a conversation with a human. Diagnose slowness by counting
   `lsof -iTCP:11434 -sTCP:ESTABLISHED` connections and `npx convex logs`.

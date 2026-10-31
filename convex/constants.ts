@@ -22,7 +22,7 @@ export const COLLISION_THRESHOLD = 0.75;
 export const MAX_HUMAN_PLAYERS = 8;
 
 // Don't talk to anyone for 45s after having a conversation (keeps the LLM queue short).
-export const CONVERSATION_COOLDOWN = 45_000;
+export const CONVERSATION_COOLDOWN = 30_000;
 
 // Don't do another activity for 10s after doing one.
 export const ACTIVITY_COOLDOWN = 10_000;
@@ -45,7 +45,7 @@ export const MAX_CONVERSATION_DURATION = 10 * 60_000; // more time locally
 // export const MAX_CONVERSATION_DURATION = 2 * 60_000;
 
 // Leave a conversation if it has more than 6 messages;
-export const MAX_CONVERSATION_MESSAGES = 6;
+export const MAX_CONVERSATION_MESSAGES = 8;
 
 // Wait for 1s after sending an input to the engine. We can remove this
 // once we can await on an input being processed.
@@ -100,7 +100,6 @@ export const NIGHT_DURATION = 60_000;
 // Agents stop starting new conversations for the last part of the evening.
 export const EVENING_WIND_DOWN = 60_000;
 
-
 // Cap on how far the clock moves in one tick, so restarting a stopped world
 // doesn't skip ahead.
 export const MAX_CLOCK_TICK = 1000;
@@ -154,7 +153,7 @@ export const GROUP_MAX_MESSAGES = 6;
 // An agent looking for company starts a group chat instead of a 1:1 with this
 // chance, when at least two other free characters are within GROUP_RADIUS tiles.
 export const GROUP_RADIUS = 6;
-export const GROUP_CHANCE = 0.2;
+export const GROUP_CHANCE = 0.3;
 
 // Town resources: what the town starts with.
 export const START_RESOURCES = { wood: 0, stone: 0, food: 20 };
@@ -238,18 +237,9 @@ export const STARVATION_DAYS = 3;
 // once (ones with the player don't count), each agent prays on a given night
 // with PRAYER_CHANCE, and a person's opinion of a decree is re-summarized at
 // most once per DECREE_OPINION_COOLDOWN.
-export const MAX_AI_CONVERSATIONS = 2;
-export const PRAYER_CHANCE = 0.5;
+export const MAX_AI_CONVERSATIONS = 4;
+export const PRAYER_CHANCE = 0.8;
 export const DECREE_OPINION_COOLDOWN = 8 * 60_000;
-
-// Background LLM work waits up to this long while the player is talking to
-// someone, so their replies come first (see convex/priority.ts).
-export const PLAYER_PRIORITY_MAX_WAIT = 45_000;
-// One background LLM request at a time (convex/priority.ts). A turn nobody
-// releases (a crashed action) expires after LLM_LEASE_MS; work gives up waiting
-// for a turn after LLM_LEASE_MAX_WAIT and goes ahead anyway.
-export const LLM_LEASE_MS = 90_000;
-export const LLM_LEASE_MAX_WAIT = 180_000;
 
 // After the world pauses or is frozen, Ollama's models are unloaded at these
 // delays (ms) to free memory; they reload on the next request.
